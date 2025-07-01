@@ -1,0 +1,21 @@
+stpFlag: debug 1. init 0. iteration 10000000. converg 1.e-5 
+
+dij: /NAS_arpg/patera/FlashElectrons/Flavio/TPS_varieEnergie/Dij_merge1.bin
+dij: /NAS_arpg/patera/FlashElectrons/Flavio/TPS_varieEnergie/Dij_merge2.bin
+dij: /NAS_arpg/patera/FlashElectrons/Flavio/TPS_varieEnergie/Dij_merge3.bin
+dij: /NAS_arpg/patera/FlashElectrons/Flavio/TPS_varieEnergie/Dij_merge4.bin
+dij: /NAS_arpg/patera/FlashElectrons/Flavio/TPS_varieEnergie/Dij_merge5.bin
+
+ptv: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/CTV.mhd Dgoal 2
+
+oar: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/vescica.mhd maxDose 1.5 DMF 1.  weight 20 
+oar: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/retto.mhd maxDose 1. DMF 1.  weight 20 
+oar: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/bulbo_penieno.mhd maxDose 1 DMF 1. weight 20 
+oar: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/testa_femorale_sx.mhd maxDose 1.5 DMF 1. weight 20 
+oar: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/testa_femorale_dx.mhd maxDose 1.5 DMF 1. weight 20 
+oar: /NAS_arpg/FlashElectrons/Flavio/FlavStudies/Flavio_mhd/ano.mhd maxDose 1. DMF 1. weight 20 
+
+NoT: maxDose 1.5  DMF 1.0 weight 20 thre 10.0  red 30.
+
+outFlag:DMF1_NewTest
+

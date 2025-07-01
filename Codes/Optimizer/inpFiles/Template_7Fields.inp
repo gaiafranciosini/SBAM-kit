@@ -1,0 +1,20 @@
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge1.bin
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge2.bin
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge3.bin
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge4.bin
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge5.bin
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge6.bin
+dij: /NAS_arpg/gaia/PROSTATA/TOMBOLINIDij_100MeV_alta/Dij_merge7.bin
+
+ptv: PTVTrue_NEW_itk.mhd Dgoal 2
+
+oar: vescica_NEW_itk.mhd maxDose 2.2 DMF 1. weight 20 
+oar: retto_NEW_itk.mhd maxDose 2.2 DMF 1. weight 20 
+oar: bulbopenieno_NEW_itk.mhd maxDose 2.2 DMF 1. weight 20 
+oar: femoredx_NEW_itk.mhd maxDose 1. DMF 1. weight 20 
+oar: femoresin_NEW_itk.mhd maxDose 1. DMF 1. weight 20 
+oar: ano_NEW_itk.mhd maxDose 2.2 DMF 1. weight 20 
+
+NoT: maxDose 1.2 DMF 1. weight 10 thre 5.
+
+outFlag: 70MeV_VeReBp22Gy_NT12_DMF1_OAR20

@@ -1,0 +1,23 @@
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge1.bin
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge2.bin
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge3.bin
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge4.bin
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge5.bin
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge6.bin
+dij: /loc_work1/gaia/FLAT_BEAM_PANCREAS_PZ1/Dij_merge7.bin
+
+ptv: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/PTVCROPPED.mhd Dgoal 6.
+
+oar: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/StomachCROPPED.mhd maxDose 4. DMF 1.  weight 20
+oar: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/DuodenumCROPPED.mhd maxDose 3.5 DMF 1. weight 5
+oar: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/LiverCROPPED.mhd maxDose 3. DMF 1. weight 5
+oar: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/Kidnesy_dxCROPPED.mhd maxDose 1. DMF 1. weight 20 
+oar: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/Spinal_CordCROPPED.mhd maxDose 1.8 DMF 1. weight 70
+oar: /NAS_arpg/gaia/FLAT_BEAM/Pancreas_PZ1/CT/Kidnesy_sxCROPPED.mhd maxDose 1. DMF 1. weight 20
+
+DoseCTRL: maxDose 2.  DMF 1. weight 9. thre 1.  red 4.
+
+outFlag:ProvaPz1_ale
+
+fluences: flat
+
