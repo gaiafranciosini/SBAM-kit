@@ -315,7 +315,6 @@ void Optimizer::selectNT_bin(vector<string> &fpaths){
     int numVxlOverThrNT=0, numVxlSelectNT=0, num_crazy_VXL=0;
     
     cout<<"AllVxl:: "<<numVxlAll<<" NumVxl before NoT "<<numVxl<<endl<<endl;
-    int jcurr=0;
     for (int i=0;i<(int)files.size();i++){
         fin = files[i];
 
@@ -369,7 +368,6 @@ void Optimizer::selectNT_bin(vector<string> &fpaths){
 	      }
 	    }
 	  }
-	  jcurr++;
 	}
     }
     cout<<"NT voxel Over Thr= "<<numVxlOverThrNT<<" NT voxel selected= "<<numVxlSelectNT<<
@@ -427,12 +425,11 @@ void Optimizer::selectDoseCtrlVolume_bin(vector<string> &fpaths){
     vector<int> DOSECTRL(numVxlAll,0);
 
     int ipb,ifield,ni;
-    int numVxlOverThrNT=0, numVxlSelectNT=0, num_crazy_VXL=0;
     
     cout<<"AllVxl:: "<<numVxlAll<<" NumVxl before DoseCTRL "<<numVxl<<endl<<endl;
-    int jcurr=0;
+
     cout<<"Parsing Dij for Dose Control Volume: ";
-    double t0=1.0*clock()/CLOCKS_PER_SEC;
+    //    double t0=1.0*clock()/CLOCKS_PER_SEC;
     for (int i=0;i<(int)files.size();i++){
         fin = files[i];
 
@@ -859,7 +856,6 @@ void Optimizer::buildD(){
 
 void Optimizer::MonitorDoseRatios(){
   double dose_in(0.), dose_out(0.);
-  int ntot(0);
 
   for(int j=0;j<npb;j++){
     //        isPBActive[j]=false;
@@ -874,9 +870,6 @@ void Optimizer::MonitorDoseRatios(){
 	  dose_out += Dij[i+j*numVxl]*Nnew[j];
 	}
       }
-    }
-    if(dose_out/(dose_in+dose_out)>0.35) {
-      ntot++;
     }
     ((TH1D*)gDirectory->Get("DoseRatioPBS"))->Fill(dose_out/(dose_in+dose_out));
     
@@ -943,7 +936,7 @@ void Optimizer::writePBs(string outFlag){
 
 void Optimizer::logFluences(int iter){
     char fname[2048];
-    sprintf(fname,"./out/flu%05d.txt",iter);
+    snprintf(fname,sizeof(fname),"./out/flu%05d.txt",iter);
     ofstream fout(fname);
     fout<<"# isource fieldID pbID NumParticles"<<endl;
     for(int j=0;j<npb;j++){
@@ -1314,7 +1307,7 @@ void *buildD_thread(void *info)
 void Optimizer::bookHistos(string out){
 
   char tmpOut[200];
-  sprintf(tmpOut,"Debug_%s.root",out.data());
+  snprintf(tmpOut,sizeof(tmpOut),"Debug_%s.root",out.data());
   f_out = new TFile(tmpOut,"RECREATE");
   
   h = new TH1D("DoseDiscrepant","Dose discrepant",100,0,1.);
