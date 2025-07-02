@@ -1,0 +1,19 @@
+dij: /NAS_arpg/fquattrini/Lung_PZ2/E130/field1/out/Dij.bin
+dij: /NAS_arpg/fquattrini/Lung_PZ2/E130/field2/out/Dij.bin
+dij: /NAS_arpg/fquattrini/Lung_PZ2/E130/field3/out/Dij.bin
+dij: /NAS_arpg/fquattrini/Lung_PZ2/E130/field4/out/Dij.bin
+
+num_fractions: NF 4
+
+ptv: /NAS_arpg/FlashElectrons/Lung_PZ2/PZ2LungVMAT/RTSTRUCT/CTV_LIS_apicale.mhd Dgoal 145  alphabeta 10.0
+ptv: /NAS_arpg/FlashElectrons/Lung_PZ2/PZ2LungVMAT/RTSTRUCT/PTV_LIS_apicale.mhd Dgoal 140  alphabeta 10.0
+
+oar: /NAS_arpg/FlashElectrons/Lung_PZ2/PZ2LungVMAT/RTSTRUCT/ChestWall_sn.mhd maxDose 60  FMFmin  0.9  weight 50  alphabeta 3.0 Dthr 9.0
+oar: /NAS_arpg/FlashElectrons/Lung_PZ2/PZ2LungVMAT/RTSTRUCT/Rib.mhd maxDose 60  FMFmin 0.9 weight 50  alphabeta 3.0 Dthr 9.0
+oar: /NAS_arpg/FlashElectrons/Lung_PZ2/PZ2LungVMAT/RTSTRUCT/Lungs-PTV.mhd maxDose 60  FMFmin 0.9 weight 80 alphabeta 3.0 Dthr 9.0
+
+
+
+DoseCTRL: maxDose 60  FMFmin 0.9 weight 10. thre 10.  red 1. alphabeta 3.0 Dthr 9.0
+stpFlag: debug 1 init 0
+outFlag: FLASH_FMFscanA
