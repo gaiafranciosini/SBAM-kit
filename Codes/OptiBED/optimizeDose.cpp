@@ -1,4 +1,3 @@
-
 //
 //  optimizeDose.cpp
 //  Fred
@@ -73,8 +72,9 @@ int main(int argc, char *argv[]){
     }
     cout<<"----------------------------------------------------------------------"<<endl;
     
-    myOpti.setConv(ConvPar);
+    myOpti.setConv(1.e-6);
     myOpti.setIterMax((int)MaxIter);
+    myOpti.setScaleFactor(0.1);
 
     cout<<"----------------------------------------------------------------------"<<endl;
     string outFlag = "def";
@@ -96,11 +96,11 @@ int main(int argc, char *argv[]){
             foundNoT = true;
             vector<string> tok=strtokens(l.substr(4));
 
-            float DMF,maxDose,weight, threshold,ReductionFactor;
+            float FMFmin,maxDose,weight, threshold,ReductionFactor;
             if((ierr=getFloatParamRequired(tok,"maxDose",maxDose))) throw ierr;
             if(maxDose<=0) throw 10;
-            if((ierr=getFloatParam(tok,"DMF",DMF,1.0))) throw ierr;
-            if(DMF<=0) throw 10;
+            if((ierr=getFloatParam(tok,"FMFmin",FMFmin,1.0))) throw ierr;
+            if(FMFmin<=0) throw 10;
             if((ierr=getFloatParam(tok,"weight",weight,100.0))) throw ierr;
             if(weight<0 or weight>100) throw 20;
             if((ierr=getFloatParam(tok,"thre",threshold,5.))) throw ierr;
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]){
             if(threshold<0) throw 20;
         //            myOpti.loadPTV_mhd(name,tok[0],plannedDose,weight/100.,DMF);
 
-        myOpti.DMF_NT     = DMF;
+        myOpti.FMFmin_NT     = FMFmin;
         myOpti.maxDose_NT = maxDose;
         myOpti.weight_NT  = weight/100.;
         myOpti.thre_NT    = threshold*1.e-11;
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]){
         }
     }
     if(foundNoT){
-        cout<<"Configuring NT with maxDose "<<myOpti.maxDose_NT<<" DMF "<<myOpti.DMF_NT<<" and weight "<<myOpti.weight_NT<<" threshold "<<myOpti.thre_NT<<" Reduction "<<myOpti.Reduction_NT<<endl;
+        cout<<"Configuring NT with maxDose "<<myOpti.maxDose_NT<<" FMFmin "<<myOpti.FMFmin_NT<<" and weight "<<myOpti.weight_NT<<" threshold "<<myOpti.thre_NT<<" Reduction "<<myOpti.Reduction_NT<<endl;
     } else {
         cout<<'\t'<<"Normal Tissue not used"<<endl;
     }
@@ -136,48 +136,74 @@ int main(int argc, char *argv[]){
             }
             vector<string> tok=strtokens(l.substr(4));
 
-            float DMF,maxDose,weight,threshold,ReductionFactor;
+            float FMFmin,maxDose,weight,threshold,ReductionFactor,alphabeta,Dthr;
             if((ierr=getFloatParamRequired(tok,"maxDose",maxDose))) throw ierr;
             if(maxDose<=0) throw 10;
-            if((ierr=getFloatParam(tok,"DMF",DMF,1.0))) throw ierr;
-            if(DMF<=0) throw 10;
+            if((ierr=getFloatParam(tok,"FMFmin",FMFmin,1.0))) throw ierr;
+            if(FMFmin<=0) throw 10;
             if((ierr=getFloatParam(tok,"weight",weight,100.0))) throw ierr;
             if(weight<0 or weight>100) throw 20;
             if((ierr=getFloatParam(tok,"thre",threshold,5.))) throw ierr;
             if(threshold<0) throw 20;
             if((ierr=getFloatParam(tok,"red",ReductionFactor,1.))) throw ierr;
             if(threshold<0) throw 20;
+	    if((ierr=getFloatParamRequired(tok,"alphabeta",alphabeta))) throw ierr;
+            if(alphabeta<=0) throw 10;
+	    if((ierr=getFloatParamRequired(tok,"Dthr",Dthr))) throw ierr;
+            if(Dthr<=0) throw 10;
 
-            myOpti.DMF_DCTRL     = DMF;
+            myOpti.FMFmin_DCTRL     = FMFmin;
             myOpti.maxDose_DCTRL = maxDose;
             myOpti.weight_DCTRL  = weight/100.;
             myOpti.thre_DCTRL    = threshold/100.; // from percentage to fraction
             myOpti.Reduction_DCTRL= ReductionFactor;
+	    myOpti.alphabeta_DCTRL = alphabeta;
+	    myOpti.Dthr_DCTRL = Dthr;
         }
     }
     if(foundDoseCTRL){
-        cout<<"Configuring DoseCTRL with maxDose "<<myOpti.maxDose_DCTRL<<" DMF "<<myOpti.DMF_DCTRL<<" and weight "<<myOpti.weight_DCTRL<<" threshold "<<myOpti.thre_DCTRL<<" Reduction "<<myOpti.Reduction_DCTRL<<endl;
+      cout<<"Configuring DoseCTRL with maxDose "<<myOpti.maxDose_DCTRL<<" FMFmin "<<myOpti.FMFmin_DCTRL<<" and weight "<<myOpti.weight_DCTRL<<" threshold "<<myOpti.thre_DCTRL<<" Reduction "<<myOpti.Reduction_DCTRL << " alpha/beta "<<myOpti.alphabeta_DCTRL<<"Dthr"<<myOpti.Dthr_DCTRL<<endl;
     } else {
         cout<<'\t'<<"Dose Control Volume not used"<<endl;
     }
     cout<<"----------------------------------------------------------------------"<<endl;
     // exit(0);
 
+    
+    int num_fractions = 0;
+    
+    for(auto & l : lines){
+      if(l.rfind("num_fractions:")==0){
+	vector<string> tok=strtokens(l.substr(14));
+	string name = tok[0].substr(0,tok[0].size()-14);
+	if((ierr=getIntParamRequired(tok,"NF",num_fractions))) throw ierr;
+	if(num_fractions<=0) throw 10;
+      }
+    }
+    Optimizer::setNumFractions(num_fractions);
+    cout << "Number of fractions = " << num_fractions << endl << endl;
+    
     cout<<"Parsing ptv: directives:"<<endl;
     for(auto & l : lines){
         if(l.rfind("ptv:")==0){
             vector<string> tok=strtokens(l.substr(4));
             string name = tok[0].substr(0,tok[0].size()-4);
-            float DMF,plannedDose,weight;
+            float FMFmin,plannedDose,weight,alphabeta, Dthr;
             if((ierr=getFloatParamRequired(tok,"Dgoal",plannedDose))) throw ierr;
             if(plannedDose<=0) throw 10;
-            if((ierr=getFloatParam(tok,"DMF",DMF,1.0))) throw ierr;
-            if(DMF<=0) throw 10;
+            if((ierr=getFloatParam(tok,"FMFmin",FMFmin,1.0))) throw ierr;
+            if(FMFmin<=0) throw 10;
             if((ierr=getFloatParam(tok,"weight",weight,100.0))) throw ierr;
             if(weight<0 or weight>100) throw 20;
-            myOpti.loadPTV_mhd(name,tok[0],plannedDose,weight/100.,DMF);
+	    if((ierr=getFloatParamRequired(tok,"alphabeta",alphabeta))) throw ierr;
+            if(alphabeta<=0) throw 10;
+	    if((ierr=getFloatParam(tok,"Dthr",Dthr,10000000.0))) throw ierr;
+	    if(Dthr<=0) throw 10;
+            myOpti.loadPTV_mhd(name,tok[0],plannedDose,weight/100.,FMFmin,alphabeta,Dthr);
         }
     }
+
+
     
     if(idbflg) cout<<"OUT size red2denseIdx = "<<myOpti.red2denseIdx.size()<<"  numVxl "<<myOpti.numVxl<<" myOpti.Von.size() "<<myOpti.Von.size()<<endl;
         
@@ -190,14 +216,18 @@ int main(int argc, char *argv[]){
         if(l.rfind("oar:")==0){
             vector<string> tok=strtokens(l.substr(4));
             string name = tok[0].substr(0,tok[0].size()-4);
-            float DMF,maxDose,weight;
+            float FMFmin,maxDose,weight,alphabeta,Dthr;
             if((ierr=getFloatParamRequired(tok,"maxDose",maxDose))) throw ierr;
             if(maxDose<=0) throw 10;
-            if((ierr=getFloatParam(tok,"DMF",DMF,1.0))) throw ierr;
-            if(DMF<=0) throw 10;
+            if((ierr=getFloatParam(tok,"FMFmin",FMFmin,1.0))) throw ierr;
+            if(FMFmin<=0) throw 10;
             if((ierr=getFloatParam(tok,"weight",weight,100.0))) throw ierr;
             if(weight<0 or weight>100) throw 20;
-            myOpti.loadOAR_mhd(name,tok[0],maxDose,weight/100.,DMF);
+	    if((ierr=getFloatParamRequired(tok,"alphabeta",alphabeta))) throw ierr;
+            if(alphabeta<=0) throw 10;
+	    if((ierr=getFloatParamRequired(tok,"Dthr",Dthr))) throw ierr;
+            if(Dthr<=0) throw 10;
+            myOpti.loadOAR_mhd(name,tok[0],maxDose,weight/100.,FMFmin,alphabeta,Dthr);
         }
     }
 
@@ -232,6 +262,11 @@ int main(int argc, char *argv[]){
     cout<<"numVxlPTV = "<<myOpti.numVxlPTV<<endl;    
     cout<<"numVxlOAR = "<<myOpti.numVxlOAR<<endl;    
     myOpti.init_DMF();
+
+    // string fnameDthr = "Dthr_"+outFlag+".mhd"; //check assegnazione FMFmin
+    //write_mhd(fnameDthr,myOpti.Dthr,nn,x0,L,l,u,f);
+
+    
     if(idbflg)
       cout<<"IN size red2denseIdx = "<<myOpti.red2denseIdx.size()<<"  numVxl "<<myOpti.numVxl<<" myOpti.Von.size() "<<myOpti.Von.size()<<endl;
 
@@ -321,7 +356,7 @@ int main(int argc, char *argv[]){
     write_mhd(fname,map,nn,x0,L,l,u,f);
 
     map.clear(); map.resize(N,0);
-    for(int64 i=0;i<myOpti.numVxl;i++){map[myOpti.red2denseIdx[i]]=myOpti.DMF[i];}
+    for(int64 i=0;i<myOpti.numVxl;i++){map[myOpti.red2denseIdx[i]]=myOpti.FMFmin[i];}
 
     fname = "alldmf_"+outFlag+".mhd";
     write_mhd(fname,map,nn,x0,L,l,u,f);
