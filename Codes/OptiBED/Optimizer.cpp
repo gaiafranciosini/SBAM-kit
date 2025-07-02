@@ -56,12 +56,12 @@ float getLowerCutoffFromCumulativeDistribution(vector<float> &di,float thres)
         hist[ibin]+=v;
     }
     // normalize
-    for(int i=0;i<hist.size();i++) hist[i]/=sum;
+    for(int i=0;i<(int)hist.size();i++) hist[i]/=sum;
     // get cumulative
-    for(int i=1;i<hist.size();i++) hist[i]+=hist[i-1];
+    for(int i=1;i<(int)hist.size();i++) hist[i]+=hist[i-1];
     // find lower cutoff for given threshold
     int icut(0);
-    for(int i=0;i<hist.size();i++) {
+    for(int i=0;i<(int)hist.size();i++) {
         icut=i;
         if(hist[i]>=thres) break;
     }
@@ -182,7 +182,7 @@ void Optimizer::loadROI_mhd(ROI &roi,string fpath){
         numVxlAll = 1UL*nn[0]*nn[1]*nn[2];
         for(int i=0;i<3;i++) {gnn[i]=nn[i];}
     } else {   // check that geometry is aligned with other ROIs
-        if(numVxlAll != 1UL*nn[0]*nn[1]*nn[2]) {
+      if(numVxlAll != (int64)1UL*nn[0]*nn[1]*nn[2]) {
             cerr<<"Error: number of voxels are different"<<endl;
             cerr<<"Expected: "<<numVxlAll<<endl;
             cerr<<"Found for "<<fpath<<" : "<<1UL*nn[0]*nn[1]*nn[2]<<endl;
@@ -470,7 +470,7 @@ void Optimizer::selectDoseCtrlVolume_bin(vector<string> &fpaths){
             fread(di.data(),ni,sizeof(float),fin);
 
             float doseCutoff = getLowerCutoffFromCumulativeDistribution(di,thre_DCTRL);
-            for(int i=0;i<Vi.size();i++){
+            for(int i=0;i<(int)Vi.size();i++){
                 if(di[i]>doseCutoff) DOSECTRL[Vi[i]]=1; // flag voxel
             }
             cout<<'.';
@@ -482,7 +482,7 @@ void Optimizer::selectDoseCtrlVolume_bin(vector<string> &fpaths){
     // cout<<"timing "<<t1-t0<<endl;
     // exit(0);
     int numVxlDoseCTRL=0;
-    for(int i=0;i<DOSECTRL.size();i++) {
+    for(int i=0;i<(int)DOSECTRL.size();i++) {
         if(DOSECTRL[i]>0) numVxlDoseCTRL++;
     }
 
@@ -513,7 +513,7 @@ void Optimizer::selectDoseCtrlVolume_bin(vector<string> &fpaths){
 
     vector<int> vv;
     vv.reserve(numVxlDoseCTRL);
-    for(int i=0;i<DOSECTRL.size();i++) {
+    for(int i=0;i<(int)DOSECTRL.size();i++) {
         if(DOSECTRL[i]>0) vv.push_back(i);
     }
 
@@ -547,7 +547,7 @@ void Optimizer::selectDoseCtrlVolume_bin(vector<string> &fpaths){
     oar.info();
 
     // add OAR to reduced matrices 
-    for(int i=0;i<oar.Vi.size();i++){
+    for(int i=0;i<(int)oar.Vi.size();i++){
         dense2redIdx[oar.Vi[i]] = numVxl++;
 	//cout << "DCTRL dense2redIdx[oar.Vi[i]] = " << dense2redIdx[oar.Vi[i]] << endl;
         numVxlOAR++;
@@ -784,7 +784,7 @@ void Optimizer::buildDgoal(){
 
 
   for(auto roi : OARs) {
-    for(int k=0;k<roi.Vi.size();k++) {
+    for(int k=0;k<(int)roi.Vi.size();k++) {
       if (dense2redIdx[roi.Vi[k]] != -1)   { // already assigned to PTV
 	//PTV has the priority.
 	iDou++;
@@ -963,7 +963,7 @@ void Optimizer::buildD(){
     vec.resize(numVxl);
   }
 
-  for (size_t f = 0; f < NF; ++f) {
+  for (int f = 0; f < NF; ++f) {
     for (int i = 0; i < numVxl; ++i) {
       D.at(f)[i] = 0.0;
       myBED.at(f)[i] = 0.0;

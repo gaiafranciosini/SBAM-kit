@@ -209,7 +209,7 @@ int main(int argc, char *argv[]){
 
     if(idbflg) {
         cout<<endl<<"Entering builDgoal size red2denseIdx = "<<myOpti.red2denseIdx.size()<<endl;;
-        for(int ii = 0; ii<myOpti.red2denseIdx.size();ii++){
+        for(int ii = 0; ii<(int)myOpti.red2denseIdx.size();ii++){
             if(myOpti.red2denseIdx[ii]<0 ){
                 cout <<ii<< "red2denseIdx[i] = "<< myOpti.red2denseIdx[ii]<<endl;
             }
@@ -254,7 +254,7 @@ int main(int argc, char *argv[]){
 
         map.clear(); map.resize(N,0);
         ROI &roi = myOpti.OARs.back();
-        for(int64 i=0;i<roi.Vi.size();i++){map[roi.Vi[i]]=roi.wei[i];}
+        for(int64 i=0;i<(int64)roi.Vi.size();i++){map[roi.Vi[i]]=roi.wei[i];}
         write_mhd("out/DoseCTRL.mhd",map,nn,x0,L,l,u,f);
         // exit(0);
     }
@@ -280,7 +280,7 @@ int main(int argc, char *argv[]){
     myOpti.loadDij_bin(Dij_files);
     if(idbflg) {
       cout<<"After loadDij_bin size red2denseIdx = "<<myOpti.red2denseIdx.size()<<"  numVxl "<<myOpti.numVxl<<" myOpti.Von.size() "<<myOpti.Von.size()<<endl;
-      for(int ii = 0; ii<myOpti.red2denseIdx.size();ii++){
+      for(int ii = 0; ii<(int)myOpti.red2denseIdx.size();ii++){
     if(myOpti.red2denseIdx[ii]<0 ){
       cout<<"WARNING : for voxel" <<ii<< "  red2denseIdx[i] = "<< myOpti.red2denseIdx[ii]<<endl;
     }

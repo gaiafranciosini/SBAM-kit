@@ -18,7 +18,7 @@ using namespace std;
 
 string tolower(const string &str){
     string s = str;
-    for(int i=0;i<s.length();i++) s[i] = ::tolower(s[i]);
+    for(int i=0;i<(int)s.length();i++) s[i] = ::tolower(s[i]);
     return s;
 }
 
@@ -26,7 +26,7 @@ int icompare(std::string const& a, std::string const& b)
 {
     if (a.length()<b.length()) return -1;
     if (a.length()>b.length()) return +1;
-    for(int i=0;i<a.length();i++) if(std::tolower(a[i])!=std::tolower(b[i])) return std::tolower(a[i])<std::tolower(b[i]) ? -1 : +1;
+    for(int i=0;i<(int)a.length();i++) if(std::tolower(a[i])!=std::tolower(b[i])) return std::tolower(a[i])<std::tolower(b[i]) ? -1 : +1;
     return 0;
 }
 
@@ -136,7 +136,7 @@ int read_mhd_header(string fname,string &dtype,int nn[3],float x0[3],float L[3],
                 // for(int i=0;i<pathtokens.size();i++) cout<<i<<" "<<pathtokens[i]<<endl;
                 dataFile="";
                 if(fname[0]=='/') dataFile="/";
-                for(int i=0;i<pathtokens.size()-1;i++) dataFile+=pathtokens[i]+"/";
+                for(int i=0;i<(int)pathtokens.size()-1;i++) dataFile+=pathtokens[i]+"/";
                 dataFile += tok;
                 // cout<<"ElementDataFile "<<dataFile<<endl;
                 // cout<<endl;

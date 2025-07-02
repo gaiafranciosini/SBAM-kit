@@ -97,7 +97,7 @@ bool isWhiteSpace(const string &s) {return emptyline(s);}
 bool isComment(string s,const vector<string> &comments){
 	if(comments.empty()) return false;
 	ltrim(s);
-	for(int k=0;k<comments.size();k++) {
+	for(int k=0;k<(int)comments.size();k++) {
 		if(s.compare(0,comments[k].length(),comments[k])==0) return true;
 	}
 	return false;
@@ -240,9 +240,9 @@ int getFloatParam(vector<string> args,string name,float & val,float def)
 int getIntParamRequired(vector<string> args,string name,int & val)
 {
 	lastParsedParameter = name;
-	for(int i=0;i<args.size();i++){
+	for(int i=0;i<(int)args.size();i++){
 		if(args[i]==name){
-			if(i==args.size()-1) return -1; // missing value
+		  if(i==(int)args.size()-1) return -1; // missing value
 			long lval;
 			lastParsedDefinition = args[i+1];
 			if(not isInteger(args[i+1],&lval)) return -2; // wrong syntax
@@ -256,9 +256,9 @@ int getIntParamRequired(vector<string> args,string name,int & val)
 int getFloatParamRequired(vector<string> args,string name,float & val)
 {
 	lastParsedParameter = name;
-	for(int i=0;i<args.size();i++){
+	for(int i=0;i<(int)args.size();i++){
 		if(args[i]==name){
-			if(i==args.size()-1) return -1; // missing value
+		  if(i==(int)args.size()-1) return -1; // missing value
 			lastParsedDefinition = args[i+1];
 			double dval;
 			if(not isNumeric(args[i+1],&dval)) return -2; // wrong syntax
