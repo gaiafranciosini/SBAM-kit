@@ -30,7 +30,8 @@ from math import *
 import numpy as np
 import ctypes
 from numpy.ctypeslib import ndpointer
-import pydicom as dicom
+#import pydicom as dicom
+import pydicom
 import matplotlib
 import matplotlib.colors as colors
 import matplotlib.ticker as ticker
@@ -64,6 +65,7 @@ def banner():
 #################### IMPORT & CHECK DICOM ##########################
 #   load fill contour dynamic library
 lib = ctypes.cdll.LoadLibrary(os.path.join(scriptDir,"./libFillContours.so"))
+print("SCRIPT DIR:: ",scriptDir);
 fillContourC = lib.fillContour_f32_f64
 fillContourC.restype = None
 fillContourC.argtypes = [ndpointer(ctypes.c_float, flags="C_CONTIGUOUS"),
@@ -154,17 +156,20 @@ def buildROI(rts,roiNum):
     
     for cont in seq.ContourSequence:
         print('.',end='',flush=True)        
-        Xcont = (np.array(cont.ContourData[0::3]) - x0) / hx
-        Ycont = (np.array(cont.ContourData[1::3]) - y0) / hy
-
+        Xcont = (+np.array(cont.ContourData[0::3]) - x0) / hx
+        Ycont = (+np.array(cont.ContourData[1::3]) - y0) / hy
+#        print("?? ",nx,ny,nz,x0,y0,hx,hy,sep='\t')
+#        print("?? ",Xcont,sep='\t')
+#        print("?? ",Ycont,sep='\t')
+        
         lev=5 # oversampling level for voxels on the boundary (1-10)
         fillContourC(mask,ny,nx,Xcont,Ycont,len(Xcont),lev)
         mask = np.abs(mask)
 
         area = abs(polygonArea(Ycont,Xcont))
         relerr = (np.sum(mask)-area)/area*100.
-        # print(area,np.sum(mask),relerr,sep='\t')
-        # print(relerr,sep='\t')
+#        print(area,np.sum(mask),relerr,sep='\t')
+#         print(relerr,sep='\t')
 
         for i in range(nz):
             if abs(Oz+i*hz-cont.ContourData[2])<=hz/2:
@@ -256,7 +261,7 @@ print('# lowest corner =',x0,y0,z0)
 # exit(0)
 
 for fname in args.rtstruct:
-    ds = dicom.read_file(fname) or die
+    ds = pydicom.dcmread(fname) or die
     if ds.SOPClassUID == '1.2.840.10008.5.1.4.1.1.481.3':   # Radiation Therapy Structure Set Storage
         rtstruct.append(ds)
     else:

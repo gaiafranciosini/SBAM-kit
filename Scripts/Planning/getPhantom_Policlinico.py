@@ -39,14 +39,12 @@ def banner():
 def loadDicoms():
 	global NZ_orig, ROIs
 	print('looking for dicom files:')
-	# load dicoms
+	#load dicoms
 	fileList = sys.argv[1:]
-	# print(fileList)
+	print(fileList)
 	for fname in fileList:
-		try:
-			dicoms.append(dicom.read_file(fname))
-		except:
-			continue
+		ds = dicom.dcmread(fname)
+		dicoms.append(ds)
 
 	for ds in dicoms:
 		if ([0x0008,0x0016] not in ds):	 # check if SOPClassUID exists
