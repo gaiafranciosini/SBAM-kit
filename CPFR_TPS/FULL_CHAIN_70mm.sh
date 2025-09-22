@@ -130,8 +130,7 @@ echo "Good luck!"
 
 #1. Get BEAM DIRECTION
 
-python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
-echo " " &
+nohup python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
 pid=$!
 SPINNER_MSG="Computing beam direction"
 wait_with_spinner_and_report "$pid"
