@@ -438,8 +438,8 @@ writeFortranRecord(fout,record)
 record = struct.pack('<3d',*hs)
 writeFortranRecord(fout,record)
 Map=Map-HUmin
-writeFortranRecord(fout,Map.tostring(order='F'))
-writeFortranRecord(fout,KREG[1:].tostring(order='F'))
+writeFortranRecord(fout,Map.tobytes(order='F'))
+writeFortranRecord(fout,KREG[1:].tobytes(order='F'))
 
 for line in matLines:
     writeFortranRecord(fout,str.encode(line))
