@@ -442,7 +442,7 @@ degRot=$(echo "${deg} * -1" | bc -l)
   what_pid=()
   mkdir -p logs
   for run in $(seq 1 "${INPs}"); do
-    nohup /NFS_homes/software/fluprogfor2020.0.10/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
+    nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
     pids+=($!)
     what_pid+=("${E}MeV_${deg}°_run${run}")
   done
