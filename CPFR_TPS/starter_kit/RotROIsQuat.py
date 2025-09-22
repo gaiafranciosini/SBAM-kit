@@ -33,10 +33,10 @@ def rotate_ct_sitk(ct_image, R, fill_value=0):
     # Centro di rotazione nel centro fisico del volume
     size = ct_image.GetSize()
     center_index = np.array(size) / 2
-    print(center_index)
+#    print(center_index)
     center_physical = ct_image.TransformContinuousIndexToPhysicalPoint(center_index)
     transform.SetCenter(center_physical)
-    print(center_physical)
+#    print(center_physical)
     # Resampling
     resampler = sitk.ResampleImageFilter()
     resampler.SetReferenceImage(ct_image)  # mantiene dimensioni, spacing, origin
@@ -75,7 +75,7 @@ def calculate_isocenter(ptv_array, spacing, origin):
     return isocenter[::-1]
 
 def main():
-    parser = argparse.ArgumentParser(description='Rotation a la Hamilton')
+    parser = argparse.ArgumentParser(description='Rotates ROIs')
     parser.add_argument("map", help="path of the CT")
     parser.add_argument("normal", nargs=3, help="shooting direction")
     parser.add_argument("out", help="rotated map mhd name")
@@ -84,7 +84,7 @@ def main():
     sitkCT=sitk.ReadImage(CT)
     voxels = mhd_read(CT)
     [nn, hs, xmin, Map] = unpackVoxels(voxels)
-    print(nn)
+#    print(nn)
 #    print(type(hs), type(xmin))
     sitkCT=xyz_to_sitk(Map, 10*hs, 10*xmin)
     normal=np.array(args.normal, dtype=float)
@@ -102,18 +102,26 @@ def main():
         R = getRotMatrix(q)
         U, _, Vt = np.linalg.svd(R)
         R = U @ Vt  # forza ortogonalità numerica
-    print("rotation angle: "+str(-np.degrees(theta))+"° around axis:", axis) 
+    print("ROTATION ANGLE: "+str(-np.degrees(theta))+"° around AXIS:", axis) 
+    print("")
+    print("ROTATION MATRIX")
     print(R)
+    print("")
     RotMap=rotate_ct_sitk(sitkCT, R, fill_value=0)
     sitk.WriteImage(RotMap,args.out)
     print("Rotated image saved as", args.out)
+    print("")
     ptv_array_zyx=sitk.GetArrayFromImage(RotMap)
 #    print(ptv_array.shape)
     iso_ptv=calculate_isocenter(ptv_array_zyx, hs[::-1], xmin[::-1])
-    print("ISO_PTV [cm]:", iso_ptv)
-
-    ptv_array=np.transpose(ptv_array_zyx,(2,1,0))
-    print(np.argwhere(ptv_array[ptv_array>1]))
+    print("ISO_PTV[cm]:"+" "+str(iso_ptv[0])+" "+str(iso_ptv[1])+" "+str(iso_ptv[2]))
+    isoptv_idx = np.floor((iso_ptv - xmin) / (hs + 1e-9)).astype(np.int64)
+    print("ISO_PTV[voxel]:"+" "+str(isoptv_idx[0])+" "+str(isoptv_idx[1])+" "+str(isoptv_idx[2]))
+    print("OFFSET: ", xmin)
+    print("SPACING: ", hs)
+    print("")
+#    ptv_array=np.transpose(ptv_array_zyx,(2,1,0))
+#    print(np.argwhere(ptv_array[ptv_array>1]))
 
 if __name__ == "__main__":
     main()

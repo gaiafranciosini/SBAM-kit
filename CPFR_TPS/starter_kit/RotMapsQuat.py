@@ -33,10 +33,10 @@ def rotate_ct_sitk(ct_image, R, fill_value=-1000):
     # Centro di rotazione nel centro fisico del volume
     size = ct_image.GetSize()
     center_index = np.array(size) / 2
-    print(center_index)
+#    print(center_index)
     center_physical = ct_image.TransformContinuousIndexToPhysicalPoint(center_index)
     transform.SetCenter(center_physical)
-    print(center_physical)
+#    print(center_physical)
     # Resampling
     resampler = sitk.ResampleImageFilter()
     resampler.SetReferenceImage(ct_image)  # mantiene dimensioni, spacing, origin
@@ -64,7 +64,7 @@ def main():
     sitkCT=sitk.ReadImage(CT)
     voxels = mhd_read(CT)
     [nn, hs, xmin, Map] = unpackVoxels(voxels)
-    print(nn)
+#    print(nn)
 #    print(type(hs), type(xmin))
     sitkCT=xyz_to_sitk(Map, 10*hs, 10*xmin)
     normal=np.array(args.normal, dtype=float)
@@ -82,8 +82,11 @@ def main():
         R = getRotMatrix(q)
         U, _, Vt = np.linalg.svd(R)
         R = U @ Vt  # forza ortogonalità numerica
-    print("rotation angle: "+str(-np.degrees(theta))+"° around axis:", axis) 
+    print("ROTATION ANGLE: "+str(-np.degrees(theta))+"° around AXIS:", axis) 
+    print("")
+    print("ROTATION MATRIX")
     print(R)
+    print("")
     RotMap=rotate_ct_sitk(sitkCT, R, fill_value=-1000)
     sitk.WriteImage(RotMap,args.out)
     print("Rotated image saved as", args.out)

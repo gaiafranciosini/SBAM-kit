@@ -1,0 +1,236 @@
+* ..+....1....+....2....+....3....+....4....+....5....+....6....+....7...
+TITLE
+Applicatore ElectronFlash con diametro di 70mm + shaper 
+*
+* use names everywhere and free format for geometry
+DEFAULTS                                                              PRECISIO
+*
+* beam definitions
+BEAM          -0.018                          -0.5      -0.5          ELECTRON
+* ..+....1....+....2....+....3....+....4....+....5....+....6....+....7...
+BEAMPOS                            -109.
+SOURCE           -2.       0.0                                        9MeV
+EMFCUT        -5E-05      5E-5             BLKHOLE  @LASTREG
+EMFCUT        -5E-05      5E-5  0.000001  HYDROGEN  @LASTMAT          PROD-CUT
+* Geometry
+GEOBEGIN                                                              COMBNAME
+* ..+....1....+....2....+....3....+....4....+....5....+....6....+....7...
+VOXELS             0         0         0                              CT
+    0    0             CT Target
+*
+* Bodies
+* ------
+*
+* Blackhole to include geometry
+SPH BLK        0.0 0.0 0.0 1000.
+* Void sphere
+SPH VOID       0.0 0.0 0.0 999.5
+SPH AIR        0.0 0.0 0.0 800.
+$start_transform -sh1
+$start_transform -rot1
+ZCC CYL1       0.0 0.0 3.5
+ZCC CYL2       0.0 0.0 1.5
+ZCC CYL3       0.0 0.0 2.5
+ZCC CYL4       0.0 0.0 2.
+ZCC CYL5       0.0 0.0 3.
+ZCC CYL6       0.0 0.0 3.5
+ZCC CYL7       0.0 0.0 2.25
+ZCC CYL8       0.0 0.0 5.5
+ZCC CYL9       0.0 0.0 12.
+ZCC CYL12      0.0 0.0 3.15
+ZCC CYL11      0.0 0.0 10.
+ZCC CYL10      0.0 0.0 5.
+ZCC CYL13      0.0 0.0 1.9
+ZCC CYL16      0.0 0.0 5.5
+ZCC CYL17      0.0 0.0 7.5
+ZCC CYL18      0.0 0.0 4.0
+ZCC CYL19      0.0 0.0 3.5
+ZCC CYL20      0.0 0.0 4.5
+ZCC CYL21      0.0 0.0 8.0
+XZP ZPT1       20.
+XZP ZPT5       -20.
+XZP ZPT6       -5.5
+XZP ZPT7       5.5
+XZP ZPT8       9.5
+XZP ZPT9       -9.5
+XYP XP0        0.0
+XYP XP1        1.2
+XYP XP2        3.15
+XYP XP3        13.44
+XYP XP4        16.56
+XYP XP5        17.604
+XYP XP6        -2.
+XYP XP7        22.1
+XYP XP14       20.1
+XYP XP8        24.95
+XYP XP9        31.01
+XYP XP10       7.05
+XYP XP11       35.81
+XYP XP12       105.86
+XYP XP13       149.85
+XYP XP15       32.36
+XYP XP16       100.17
+XYP XP17       105.17
+XYP XP18       105.85
+XYP XPV        -10.
+XYP XPT        -0.0055
+XYP XPT1       -0.1
+XYP XPT2       0.0
+XYP XPT3       36.85
+RPP TITANT     -1.9 1.9 -1.9 1.9 -0.0055 0.0
+*RPP TARGET     -10. 10. -10. 10. 101.85 107.85
+*         lam1
+*          --
+*  lam3 |      |  lam4
+*          __
+*         lam2
+RPP lam1       -4.0 4.0 0.4 4.4 105.86 106.16
+RPP lam2       -4.0 4.0 -4.4 -0.4 105.86 106.16
+RPP lam3       0.4 4.4 -4.0 4.0 106.66 106.96
+RPP lam4       -4.4 -0.4 -4.0 4.0 106.66 106.96
+TRC CONE1      0.0 0.0 0.0 0.0 0.0 1.2 0.7 1.9
+TRC CONE2      0.0 0.0 24.95 0.0 0.0 6.06 2.25 3.15
+TRC CONE3      0.0 0.0 31.01 0.0 0.0 4.80 4.0 3.5
+$end_transform
+$end_transform
+*
+END
+*
+* Regions
+* -------
+*
+* Blackhole
+BLKHOLE      5 +BLK-VOID
+VAC          5 +CYL13 +XPT-XPV-VOXEL
+PMMAC1       5 +CYL1 -CONE1 -XP0 +XP1
+PMMAC2       5 +CYL3 -CYL2 -XP1 +XP2
+PMMAC3       5 +CYL3 -CYL4 -XP2 +XP4
+PMMAC4       5 +CYL6 -CYL5 -XP3 +XP5
+PMMAC5       5 +CYL6 -CYL7 -XP5 +XP8
+PMMAC6       5 +CYL8 -CONE2 -XP8 +XP9
+PMMAC7       5 +CYL8 -CONE3 -XP9 +XP11
+#if 0
+PMMAC9       5 +CYL8 -CYL12 -XP9 +XP15
+#endif
+PMMAC8       5 +CYL18 -CYL19 -XP11 +XP12
+ALLC1        5 +CYL9-CYL6 -XP14 +XP7
+ALLC2        5 +CYL9-CYL11 -XP0 +XP14
+INT1         5 +CYL11-CYL1-XP0 +XP1
+INT2         5 +CYL11-CYL10 -XP1 +XP10
+INT3         5 +CYL11-CYL3 -XP10 +XP3
+INT4         5 +CYL11-CYL6 -XP3 +XP14
+NYLC1        5 +CYL10 -CYL3 -XP1 +XP10
+AIRC1        5 +CONE1 -XP0 +XP1
+#if 0
+AIRC10       5 +CYL12 -XP9 +XP15
+#endif
+AIRC2        5 +CYL2 -XP1 +XP2
+AIRC3        5 +CYL4 -XP2 +XP4
+AIRC4        5 +CYL5 -CYL3 -XP3 +XP4
+AIRC5        5 +CYL5 -XP4 +XP5
+AIRC6        5 +CYL7 -XP5 +XP8
+AIRC7        5 +CONE2 -XP8 +XP9
+AIRC8        5 +CONE3 -XP9 +XP11
+AIRC9        5 CYL19-XP11 +XP12
+AIRC11       5 +CYL20-CYL18 -XP16+XP17
+AIRC12       5 +CYL21-CYL18 -XP17+XP18
+INAIR        5 |+VOID -CYL9 -XP0 +XP1
+               | +VOID -CYL9 -XP1 +XP14
+               | +VOID - CYL9 -XP14 + XP7
+               | +VOID -CYL6 -XP7 + XP8
+               | +VOID -CYL8 -XP8 +XP11
+               | +VOID -CYL18-XP11+XP16
+               |+VOID -CYL20 -XP16 +XP17
+               |+VOID -CYL21 -XP17 +XP18
+               |+VOID -CYL18 -XP18 +XP12
+               | +VOID -XP12 +XP13 -lam1 -lam2 -lam3 -lam4-VOXEL
+               | +VOID -XP13
+               | +VOID +XPT -XPV -CYL13
+               | +VOID +XPV
+               | +VOID -XPT +XP0 -TITANT
+#if 0
+INAIR1       5 +VOID -CYL1 -XP0 +XP1
+               | +VOID -CYL10 -XP1 +XP10
+               | +VOID -CYL3 -XP10 +XP3
+               | +VOID -CYL6 -XP3 +XP6
+               | +VOID -CYL8-XP6 +XP7
+               | +VOID -CYL6-XP7 +XP8
+               | +VOID -CYL8-XP8 +XP11
+               | +VOID -CYL16-XP11+XP12
+               | +VOID -XP12
+               | +VOID -XP13
+               | +VOID +XPT -XPV -CYL13
+               | +VOID +XPV
+               | +VOID -XPT +XP0 -TITANT
+#endif
+TITARG       5 +TITANT
+LAM1         5 +lam1
+LAM2         5 +lam2
+LAM3         5 +lam3
+LAM4         5 +lam4
+*PHANTOM      5 +TARGET
+END
+GEOEND
+*
+* Assign materials
+* ----------------
+ASSIGNMA    BLCKHOLE   BLKHOLE
+ASSIGNMA      VACUUM       VAC
+ASSIGNMA      VACUUM     VOXEL
+ASSIGNMA         AIR     INAIR
+ASSIGNMA        PEEK    PMMAC1
+ASSIGNMA        PEEK    PMMAC2
+ASSIGNMA        PEEK    PMMAC3
+ASSIGNMA        PEEK    PMMAC7
+ASSIGNMA        PEEK    PMMAC4
+ASSIGNMA        PEEK    PMMAC5
+ASSIGNMA        PEEK    PMMAC6
+ASSIGNMA    Polymeth    PMMAC7
+ASSIGNMA    Polymeth    PMMAC8
+*ASSIGNMA    Polymeth    PMMAC9
+ASSIGNMA    TITANIUM    TITARG
+ASSIGNMA         AIR     AIRC1
+ASSIGNMA         AIR     AIRC2
+ASSIGNMA         AIR     AIRC3
+ASSIGNMA         AIR     AIRC4
+ASSIGNMA         AIR     AIRC5
+*ASSIGNMA         AIR    AIRC10
+ASSIGNMA         AIR     AIRC6
+ASSIGNMA         AIR     AIRC7
+ASSIGNMA         AIR     AIRC8
+ASSIGNMA         AIR      INT1
+ASSIGNMA         AIR      INT2
+ASSIGNMA         AIR      INT3
+ASSIGNMA         AIR      INT4
+ASSIGNMA         AIR     AIRC9
+ASSIGNMA       Nylon    AIRC11
+ASSIGNMA       Nylon    AIRC12
+*ASSIGNMA       WATER   PHANTOM
+ASSIGNMA    ALUMINUM     ALLC1
+ASSIGNMA    ALUMINUM     ALLC2
+ASSIGNMA        IRON     NYLC1
+ASSIGNMA    TUNGSTEN      LAM1
+ASSIGNMA    TUNGSTEN      LAM2
+ASSIGNMA    TUNGSTEN      LAM3
+ASSIGNMA    TUNGSTEN      LAM4
+MATERIAL                            1.32                              Polymeth
+MATERIAL                            1.31                              PEEK
+MATERIAL                            1.14                              Nylon
+COMPOUND         14.  HYDROGEN       19.    CARBON        3.    OXYGENPolymeth
+COMPOUND          2.  FLUORINE                                        Polymeth
+COMPOUND         14.  HYDROGEN       19.    CARBON        3.    OXYGENPEEK
+COMPOUND                                                              PEEK
+COMPOUND        12.0    CARBON      22.0  HYDROGEN       2.0  NITROGENNylon
+COMPOUND         2.0    OXYGEN                                        Nylon
+MATERIAL          9.           0.0015803                              FLUORINE
+MATERIAL         13.              2.6989                              ALUMINUM
+MATERIAL          6.                  2.                              CARBON
+MATERIAL         19.               0.862                              POTASSIU
+* ..+....1....+....2....+....3....+....4....+....5....+....6....+....7...
+ROT-DEFI         202         0         0         0         0      107.sh1
+ROT-DEFI         301         0       -30         0         0         0rot1
+USRBIN           10.       228      -23.        26        24        10dose2
+USRBIN           20.       20.        0.      512.      512.      290. &
+RANDOMIZ                    1.
+START      3.333E+04                                     0.0                    
+STOP

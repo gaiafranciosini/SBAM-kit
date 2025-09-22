@@ -177,9 +177,9 @@ def main():
     front, up, left = compute_beam_vectors(front)
 
     print("--DIRECTION ORTHOGONAL TO SURFACE--")
-    print("FRONT", front)
-    print("UP", up)
-    print("LEFT", left)
+    print("BEAM DIRECTION:  "+str(front[0])+" "+str(front[1])+" "+str(front[2]))
+#    print("UP", up)
+#    print("LEFT", left)
 
     if args.plot:
         plot_3d(ptv_coords, points_in_sphere, skin_coords, front, rep_coords)

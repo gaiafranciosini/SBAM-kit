@@ -144,6 +144,9 @@ def main():
     ptv_array, spacing, origin = load_ptv(args.ptv_path)
     print("spacing[cm]:", spacing)
     print("origin[cm]:", origin)
+    z_min_idx=np.min(np.argwhere(ptv_array>0), axis=0)[2]
+    z_min_coord=z_min_idx*spacing[2]+origin[2]
+    print("Z_CROP:", z_min_idx, "[voxel]", z_min_coord, "[cm]")
     print(ptv_array.shape)
     isocenter = calculate_isocenter(ptv_array, spacing, origin)
     iso_idx = (isocenter-origin)/spacing
@@ -159,12 +162,12 @@ def main():
 
     for R in rectangles:
         print(f"  Angle: {R['angle']}\u00b0")
-        print(f"  Width: {R['width']:.2f} cm")
-        print(f"  Height: {R['height']:.2f} cm")
-        print(f"  Left: {R['relative_coords']['left']:.2f} mm")
-        print(f"  Right: {R['relative_coords']['right']:.2f} mm")
-        print(f"  Bottom: {R['relative_coords']['bottom']:.2f} mm")
-        print(f"  Top: {R['relative_coords']['top']:.2f} mm")
+        print(f"  Width_{R['angle']}: {R['width']:.2f} cm")
+        print(f"  Height_{R['angle']}: {R['height']:.2f} cm")
+#        print(f"  Left: {R['relative_coords']['left']:.2f} mm")
+#        print(f"  Right: {R['relative_coords']['right']:.2f} mm")
+#        print(f"  Bottom: {R['relative_coords']['bottom']:.2f} mm")
+#        print(f"  Top: {R['relative_coords']['top']:.2f} mm")
         print(f"  Area Difference: {R['area_diff']:.2f} mm²")
         print("")
     print("***************")

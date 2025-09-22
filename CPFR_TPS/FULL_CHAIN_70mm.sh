@@ -48,6 +48,15 @@ wait_with_spinner_and_report() {
 
   # Ritorna 0/1 in base all'esito
   (( fail == 0 ))
+
+#USAGE:
+#( sleep 5 ) &
+#pid=$!
+#SPINNER_MSG="Simulazione in corso"
+#wait_with_spinner_and_report "$pid"
+
+
+
 }
 
 #++++++++++++++++++++++++++++++++++
@@ -87,10 +96,50 @@ if [[ "$CHOICE" != "7" && "$CHOICE" != "9" && "$CHOICE" != "7 9" && "$CHOICE" !=
     exit 1
 fi
 
+echo "Prescription dose [Gy] and volume [%]:"
+read -a preDV
+
+preD=${preDV[0]}
+preV=${preDV[1]}
+
+echo "How many primaries do you want to generate?"
+read primaries
+
+echo "How many CPUs are available?"
+read available_CPUs
+
+python3 starter_kit/eval_cpu.py -cpu "${available_CPUs}"  -A "${#angles[@]}"  -E "${#energies[@]}"  -P "${primaries}" > cpu_setup.out
+
+INPs=$(awk -F': ' '/INPs/{print $2}' cpu_setup.out)
+primaries_per_CPU=$(awk -F': ' '/PRIMARIES/{print $2}' cpu_setup.out)
+CPUs=$(awk -F': ' '/CPUs/{print $2}' cpu_setup.out)
+
+echo "You are using ${CPUs} CPUs, running ${primaries_per_CPU} per CPU"
+echo "Each setup (beam energy+shaper angle) simulation is distributed over ${INPs} CPUs"
+echo " "
+echo "Press any key to proceed or CMD+Z to exit"
+echo " "
+
+bash starter_kit/card_modifier.sh starter_kit/EF70mm_start.inp starter_kit/tmp.inp "START" 1 "${primaries_per_CPU}" 1
+mv starter_kit/tmp.inp starter_kit/EF70mm_start.inp
+
+read wait
+
+echo "Good luck!"
+
+
 #1. Get BEAM DIRECTION
 
 #!!!!!!! UNCOMMENT !!!!!!!!!!
-python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out
+
+
+#python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
+echo " " &
+pid=$!
+SPINNER_MSG="Computing beam direction"
+wait_with_spinner_and_report "$pid"
+
+
 output=$(grep "BEAM DIRECTION:" out.out | head -n 1)
 
 read -r Vx Vy Vz < <(echo "$output" | awk '{
@@ -104,22 +153,19 @@ read -r Vx Vy Vz < <(echo "$output" | awk '{
   }
 }')
 
-echo "BEAM DIRECTION   Vx: $Vx | Vy: $Vy | Vz: $Vz"
+echo "Beam direction: Vx:${Vx} Vy:${Vy} Vz:${Vz}"
 
-# 2.a Rotation of ROIs and CT
+echo "Rotating PTV, ROIs and CT"
 python3 starter_kit/RotROIsQuat.py "$PTV" "$Vx" "$Vy" "$Vz" imgs/PTV_ROT.mhd > ptv.out
-echo
-echo
+echo "PTV rotated and saved as imgs/PTV_ROT.mhd"
 for roi in "${ROIs[@]}"; do
   python3 starter_kit/RotROIsQuat.py "imgs/${roi}.mhd" "$Vx" "$Vy" "$Vz" imgs/${roi}_ROT.mhd > trash.out
   echo "${roi} rotated and saved as imgs/${roi}_ROT.mhd"
 done
-echo
-echo
-python3 starter_kit/RotMapsQuat.py "$CT" "$Vx" "$Vy" "$Vz" imgs/CT_ROT.mhd
-echo
+python3 starter_kit/RotMapsQuat.py "$CT" "$Vx" "$Vy" "$Vz" imgs/CT_ROT.mhd > trash.out
+echo "CT rotated and saved as imgs/CT_ROT.mhd"
 
-# 2.b Shifting ROIs and CT to center the PTV in [0,0,z]
+echo "Shifting ROIs and CT to center the PTV in [0,0,z]"
 
 output=$(grep -F "ISO_PTV[voxel]:" ptv.out | head -n 1)
 read -r idxPTVx idxPTVy idxPTVz < <(echo "$output" | awk '{
@@ -132,9 +178,7 @@ read -r idxPTVx idxPTVy idxPTVz < <(echo "$output" | awk '{
     }
   }
 }')
-echo
 echo "X_ptv[idx]: $idxPTVx | Y_ptv[idx]: $idxPTVy | Z_ptv[idx]: $idxPTVz"
-echo
 
 output=$(grep -F "ISO_PTV[cm]:" ptv.out | head -n 1)
 read -r PTVx PTVy PTVz < <(echo "$output" | awk '{
@@ -147,32 +191,40 @@ read -r PTVx PTVy PTVz < <(echo "$output" | awk '{
     }
   }
 }')
-echo
 echo "X_ptv: $PTVx | Y_ptv: $PTVy | Z_ptv: $PTVz"
-echo
 
 SHx=$(echo "$PTVx * -1" | bc -l)
 SHy=$(echo "$PTVy * -1" | bc -l)
 
 python3 starter_kit/mhd_shift.py "imgs/CT_ROT.mhd" "${SHx}" "${SHy}" 0 imgs/CT_SH.mhd > trash.out
-echo "CT shifted"
+echo "CT shifted  and saved as imgs/CT_SH.mhd"
 python3 starter_kit/mhd_shift.py "imgs/PTV_ROT.mhd" "${SHx}" "${SHy}" 0 imgs/PTV_SH.mhd > trash.out
-echo "PTV_shifted"
+echo "PTV_shifted  and saved as imgs/PTV_SH.mhd"
 
 for roi in "${ROIs[@]}"; do
   python3 starter_kit/mhd_shift.py "imgs/${roi}_ROT.mhd" "${SHx}" "${SHy}" 0  imgs/${roi}_SH.mhd > trash.out
-  echo "${roi} shifted"
+  echo "${roi} shifted and saved as imgs/${roi}_SH.mhd"
 done
 echo
 
 # 3. FIELD SIZE dimensions (modify slit size with applicator) !!!!!!!!!!!!!!!!!!!!!!!
+echo "Optimising field size for each shaper orientation"
+
 cp "starter_kit/EF70mm_start.inp" "starter_kit/EF70mm.inp"
 echo "inp copied"
 width=8.0
 height=4.0
-echo "SLIT SIZE: ${width}x${height}"
+echo "Slit size for 70mm applicator: ${width}x${height}cm^2"
 
-python3 starter_kit/GetFieldSize.py imgs/PTV_SH.mhd -rot "${angles[@]}" > rectangles.out
+python3 starter_kit/GetFieldSize.py imgs/PTV_SH.mhd -rot "${angles[@]}" > rectangles.out &
+
+pid=$!
+SPINNER_MSG="Optimising geometry"
+wait_with_spinner_and_report "$pid"
+
+echo "Geometry optimization details reported in rectangles.out"
+echo " "
+echo "Cropping PTV, CT and ROIs"
 python3 starter_kit/mhd_info.py imgs/CT_SH.mhd > info.out
 output=$(grep "dims=" info.out | head -n 1)
 
@@ -207,7 +259,7 @@ read -r X0crop Y0crop Z0crop < <(echo "$output" | awk '{
     }
   }
 }')
-echo "crop: $X0crop $Y0crop $Z0crop"
+echo "Images cropped at [cm]: $X0crop $Y0crop $Z0crop"
 #***for USRBIN***
 
 output=$(grep "new_end:" crop.out | head -n 1)
@@ -235,7 +287,7 @@ read -r dimXcrop dimYcrop dimZcrop < <(echo "$output" | awk '{
 }')
 #*** ***
 
-echo "DIM crop: $dimXcrop $dimYcrop $dimZcrop"
+echo "Cropped images dimensions: $dimXcrop $dimYcrop $dimZcrop"
 
 bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 4 "${Xfcrop}" 1
 bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 5 "${Yfcrop}" 1
@@ -256,14 +308,14 @@ bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.i
 #mv starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp
 
 echo "FLUKA inp modified"
-echo "ZCROP ${Z0crop}"
 SHz=$(echo "${Z0crop} * -1" | bc -l)
-echo "${SHz}"
 python3 starter_kit/mhd_shift.py "imgs/CT_CROP.mhd" 0 0 ${SHz} imgs/CT_plan.mhd > trash.out
 python3 starter_kit/mhd_shift.py "imgs/PTV_CROP.mhd" 0 0 ${SHz} imgs/PTV_plan.mhd > trash.out
 for roi in ${ROIs[@]}; do
   python3 starter_kit/mhd_shift.py "imgs/${roi}_CROP.mhd" 0 0 ${SHz} imgs/${roi}_plan.mhd > trash.out
 done
+
+echo "z-offset removed from CT; PTV and ROIs"
 
 mv starter_kit/fredCTHU2flukaVoxels.py imgs/
 mv starter_kit/hu2materials_fredEMGPU.txt imgs/
@@ -280,20 +332,21 @@ python3 mhd_clamp.py ${file} -o ${filenameclamped} -vmin -1000 -vmax 1376 > tras
 mv CTHU.vxl ${filename}.vxl
 rm ${filenameclamped}
 
-echo "${filename}.vxl"
 mv ${filename}.vxl CT.vxl
-echo "CT.vxl created"
+echo "CT .mhd file converted to .vxl as required by FLUKA"
 cd ..
 
 mv imgs/fredCTHU2flukaVoxels.py starter_kit/
 mv imgs/hu2materials_fredEMGPU.txt starter_kit/
 mv imgs/mhd_clamp.py starter_kit/
 
-python3 starter_kit/mhd_astype.py imgs/CT_plan.mhd float32
-python3 starter_kit/mhd_astype.py imgs/PTV_plan.mhd float32
+python3 starter_kit/mhd_astype.py imgs/CT_plan.mhd float32 > trash.out
+python3 starter_kit/mhd_astype.py imgs/PTV_plan.mhd float32 > trash.out
 for roi in ${ROIs[@]}; do
-python3 starter_kit/mhd_astype.py imgs/${roi}_plan.mhd float32
+python3 starter_kit/mhd_astype.py imgs/${roi}_plan.mhd float32 > trash.out
 done
+
+echo "CT, PTV and ROIs values converted to float32" 
 
 Ws=()
 Hs=()
@@ -329,7 +382,7 @@ for deg in "${angles[@]}"; do
   Yi_down=$(echo "scale=3; ${Yf_down} - ${height}" | bc -l)
   Yi_up=$(echo "scale=3; $H / 2" | bc -l)
   Yf_up=$(echo "scale=3; ${Yi_up} + ${height}" | bc -l)
-  echo "$Xi_right $Xf_right $Xi_left $Xf_left $Yi_down $Yf_down $Yi_up $Yf_up"
+#  echo "$Xi_right $Xf_right $Xi_left $Xf_left $Yi_down $Yf_down $Yi_up $Yf_up"
 #  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
 #  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
 #  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
@@ -386,12 +439,15 @@ degRot=$(echo "${deg} * -1" | bc -l)
   cp starter_kit/simkit${E}MeV/* sim${E}MeV_${deg}deg/
 
   cd sim${E}MeV_${deg}deg
-  bash crea_input_homemade.sh EF70mm${E}MeV_${deg}deg.inp 5 
+  bash crea_input_homemade.sh EF70mm${E}MeV_${deg}deg.inp ${INPs} > trash.out
+  echo "FLUKA input files created for ${E}MeV - ${deg}° treatment dose evaluation"
   pids=()
+  what_pid=()
   mkdir -p logs
-  for run in {1..5}; do
+  for run in $(seq 1 "${INPs}"); do
     nohup /NFS_homes/software/fluprogfor2020.0.10/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
     pids+=($!)
+    what_pid+=("${E}MeV_${deg}°_run${run}")
   done
   printf "%s\n" "${pids[@]}" > processall.pid
   cd ..
@@ -401,11 +457,13 @@ done
 
 echo "Waiting all the simulations to be completed"
 fail=0
+i=0
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
     ((fail++))
-    echo "Process PID $pid terminated with an error"
+    echo "Process PID ${pid} (${what_pid[i]}) terminated with an error"
   fi
+  (( i++ ))
 done
 
 if ((fail==0)); then
@@ -420,14 +478,14 @@ for roi in "${ROIs[@]}"; do
 all_rois_path+=("../imgs/${roi}_plan.mhd")
 ROIs_plan+=("${roi}_plan")
 done 
-echo "${ROIs_plan[@]}"
+
 
 
 pids=()
 for E in "${energies[@]}"; do
 for deg in "${angles[@]}"; do
   cd sim${E}MeV_${deg}deg
-  for run in {1..5}
+  for run in $(seq 1 "${INPs}")
   do
     nohup ./bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 & 
     pids+=("$!")
@@ -438,11 +496,13 @@ done
 
 echo "Waiting all .bnn files to be converted to .mhd maps"
 fail=0
+i=0
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
     ((fail++))
-    echo "Process PID $pid terminated with an error"
+    echo "Process PID $pid (${what_pid[i]}) terminated with an error"
   fi
+  (( i++ ))
 done
 
 if ((fail==0)); then
@@ -480,7 +540,9 @@ pids=()
 for E in "${energies[@]}"; do
 for deg in "${angles[@]}"; do
   cd sim${E}MeV_${deg}deg
-  mv avg.mhd DOSE_${E}MeV_${deg}deg.mhd
+  cp ../starter_kit/mhd_smooth.x ./
+  ./mhd_smooth.x avg.mhd -o avg_smooth.mhd > trash.out
+  mv avg_smooth.mhd DOSE_${E}MeV_${deg}deg.mhd
 
   python3 ../starter_kit/mhd_info.py -v DOSE_${E}MeV_${deg}deg.mhd > dose_info.out
   output=$(grep "range=" dose_info.out | head -n 1)
@@ -495,12 +557,17 @@ for deg in "${angles[@]}"; do
       }
     }
   }')
-  echo "$min $max"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -divider ${max}
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -multiplier 500
 
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -divider ${max}
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -multiplier 50
+
+  echo "Creating dose map and DVH for ${E}MeV ${deg}°"
   mkdir -p DVH${E}MeV_${deg}deg
-  ../starter_kit/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${deg}deg.mhd -type float -fileLabel ${E}MeV${deg}deg -dir DVH${E}MeV_${deg}deg > trash.out
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${deg}deg.mhd -type float -fileLabel ${E}MeV${deg}deg -dir DVH${E}MeV_${deg}deg > trash.out
+  cp ../starter_kit/find_prescription_point.py ./
+  rescale_factor=$(python3 find_prescription_point.py "DVH${E}MeV_${deg}deg/PTV_plan${E}MeV${deg}deg.txt" ${preD} ${preV})
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -multiplier "${rescale_factor}"
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${deg}deg.mhd -type float -fileLabel ${E}MeV${deg}deg -dir DVH${E}MeV_${deg}deg > trash.out
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV${deg}deg -dir1 DVH${E}MeV_${deg}deg -roi PTV_plan "${ROIs_plan[@]}" > trash.out
   nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV_${deg}deg.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
@@ -533,7 +600,7 @@ if ! wait_with_spinner_and_report "$pid"; then
   continue
 fi
 mv compare_all_DVHs.py starter_kit/compare_all_DVHs.py
-echo "Enjoy!"
+echo "Wait just another moment and enjoy!"
 xdg-open DVH_ALL.png &
 
 
