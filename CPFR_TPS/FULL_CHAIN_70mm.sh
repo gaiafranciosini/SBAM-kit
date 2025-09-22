@@ -41,9 +41,9 @@ wait_with_spinner_and_report() {
   fi
 
   if (( fail == 0 )); then
-    echo "All simulations terminated successfully"
+    echo "Process terminated successfully"
   else
-    echo "$fail process(es) terminated with an error"
+    echo "$fail process terminated with an error"
   fi
 
   # Ritorna 0/1 in base all'esito
@@ -512,6 +512,10 @@ pids=()
 for E in "${energies[@]}"; do
 for deg in "${angles[@]}"; do
   cd sim${E}MeV_${deg}deg
+  check=(dose_tot_run*)
+  if (( ${#check[@]} == 1 )); then
+    cp "${check[0]}" dose_tot_run_copy.mhd
+  fi
   nohup mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
