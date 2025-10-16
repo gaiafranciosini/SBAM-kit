@@ -236,6 +236,11 @@ read -r dimX dimY dimZ < <(echo "$output" | awk '{
 }')
 
 cropZ=$(( idxPTVz - 1 )) #to make sure that the first slice of the PTV is not cut out
+if ((cropZ<0)); then
+    cropZ=0
+fi
+echo "CT cropping with such dimensions: ${dimX} ${dimY} ${cropZ} ${dimZ}"
+
 python3 starter_kit/mhd_crop.py \-i imgs/CT_SH.mhd \-o imgs/CT_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > crop.out
 python3 starter_kit/mhd_crop.py \-i imgs/PTV_SH.mhd \-o imgs/PTV_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > trash.out
 for roi in "${ROIs[@]}"; do
