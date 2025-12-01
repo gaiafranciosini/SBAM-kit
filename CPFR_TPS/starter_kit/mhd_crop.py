@@ -56,4 +56,4 @@ print('cropped map written to file:',fout)
 print("new_dims: "+str(ixf-ixi)+" "+str(iyf-iyi)+" "+str(izf-izi))
 print("new_offset: "+str(x0new[0])+" "+str(x0new[1])+" "+str(x0new[2]))
 print("new_end: "+str(xFnew[0])+" "+str(xFnew[1])+" "+str(xFnew[2]))
-
+print("new_L: "+str(xFnew[0]-x0new[0])+" "+str(xFnew[1]-x0new[1])+" "+str(xFnew[2]-x0new[2]))

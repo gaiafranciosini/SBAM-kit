@@ -44,7 +44,7 @@ box2=ax1.get_position()
 ax1.set_position([box2.x0, box2.y0 + box2.height * 0.1,
     box2.width, box2.height * 0.9])
 
-plt.plot([args.Dgoal*0.95],[95],'r*',lw=5,markerfacecolor='r', markeredgewidth=1, markeredgecolor='yellow',markersize=17)
+plt.plot([args.Dgoal*1],[95],'r*',lw=5,markerfacecolor='r', markeredgewidth=1, markeredgecolor='yellow',markersize=17)
 star = Line2D([], [],marker='*',linewidth='0',markerfacecolor='r',markeredgewidth=1,markeredgecolor='yellow' ,markersize=17, label='V95% 95%')
 
 legend1=plt.legend(loc = 'upper center',bbox_to_anchor=(0.5,-0.2),fancybox=True,shadow=True,ncol=3)

@@ -1,40 +1,84 @@
 #!/bin/bash
+#++++++++++++++++++++++++++++++++++
 
-#read -p "CT path:  " CT
-#read -p "PTV path:  " PTV
-#read -p "MARKER path:  " MARKER
-#
-#echo "ROIs paths:  " 
-#read -a ROIpaths
-#
-#for path in "${ROIpaths[@]}"; do
-#  # Rimuove "imgs/" e ".mhd"
-#  name="${path##*/}"         # rimuove il percorso → osso.mhd
-#  name="${name%.mhd}"        # rimuove l'estensione → osso
-#  ROIs+=("$name")     # aggiunge all'array
-#done
-#
-#+++++++++++++++++++++++++++++++++
+file="$1"
+CT="$2"
+PTV="$3"
+MARKER="$4"
+
+if [ "$#" -lt 4 ]; then
+  echo "Use: CT PTV MARKER [ROI1 ROI2 ROI3 ROI4 ...]"
+  exit 1
+fi
+
+shift 4
+
+# Array che conterr   i nomi puliti
+ROIs=()
+
+# Ciclo sugli argomenti rimanenti
+for path in "$@"; do
+  # Rimuove "imgs/" e ".mhd"
+  name="${path##*/}"         # rimuove il percorso  ^f^r osso.mhd
+  name="${name%.mhd}"        # rimuove l'estensione  ^f^r osso
+  ROIs+=("$name")     # aggiunge all'array
+done
+#++++++++++++++++++++++++++++++++++
 
 
-wait_with_spinner_and_report() {
-  local pid="$1"
-  local spin='|/-\'
-  local i=0
-  local msg="${SPINNER_MSG:-Working}"
+# Inizializza variabili
+ape=()
+energies=()
+#preD=""
+#preV=""
+primaries=""
+available_CPUs=""
+INPs=""
+primaries_per_CPU=""
+CPUs=""
 
-  # Spinner mentre il processo è vivo
-  while kill -0 "$pid" 2>/dev/null; do
-    i=$(( (i+1) % 4 ))
-    printf "\r%s %s" "$msg" "${spin:$i:1}"
-    sleep 0.2
-  done
+# Legge il file riga per riga
+while IFS= read -r line; do
+    case "$line" in
+        "APERTURE:"*)
+            # Estrai tutto dopo i due punti e converti in array
+            ape=(${line#APERTURE: })
+            ;;
+        "ENERGY:"*)
+            energies=(${line#ENERGY: })
+            ;;
+#        "PERCENTAGE PRESCRIPTION DOSE:"*)
+#            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
+#            ;;
+#        "PERCENTAGE PRESCRIPTION VOLUME:"*)
+#            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
+#            ;;
+        "PRIMARIES:"*)
+            primaries=${line#PRIMARIES: }
+            ;;
+        "AVAILABLE CPUs:"*)
+            available_CPUs=${line#AVAILABLE CPUs: }
+            ;;
+        "INP FILES:"*)
+            INPs=${line#INP FILES: }
+            ;;
+        "PRIMARIES PER CPU:"*)
+            primaries_per_CPU=${line#PRIMARIES PER CPU: }
+            ;;
+        "USED CPUs:"*)
+            CPUs=${line#USED CPUs: }
+            ;;
+    esac
+done < "$file"
 
-  # Linea finale "Done!" come nel tuo snippet
-  printf "\rDone!   \n"
 
-  # Report esito come nel tuo codice
-  local fail=0
+#1. Get BEAM DIRECTION
+
+nohup python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
+pid=$!
+echo "Computing beam direction"
+
+  fail=0
   if ! wait "$pid"; then
     ((fail++))
     echo "Process PID $pid terminated with an error"
@@ -45,96 +89,6 @@ wait_with_spinner_and_report() {
   else
     echo "$fail process terminated with an error"
   fi
-
-  # Ritorna 0/1 in base all'esito
-  (( fail == 0 ))
-
-#USAGE:
-#( sleep 5 ) &
-#pid=$!
-#SPINNER_MSG="Simulazione in corso"
-#wait_with_spinner_and_report "$pid"
-
-
-
-}
-
-#++++++++++++++++++++++++++++++++++
-
-
-CT="$1"
-PTV="$2"
-MARKER="$3"
-
-if [ "$#" -lt 3 ]; then
-  echo "Use: CT PTV MARKER [ROI1 ROI2 ROI3 ROI4 ...]"
-  exit 1
-fi
-
-shift 3
-
-# Array che conterrà i nomi puliti
-ROIs=()
-
-# Ciclo sugli argomenti rimanenti
-for path in "$@"; do
-  # Rimuove "imgs/" e ".mhd"
-  name="${path##*/}"         # rimuove il percorso → osso.mhd
-  name="${name%.mhd}"        # rimuove l'estensione → osso
-  ROIs+=("$name")     # aggiunge all'array
-done
-#++++++++++++++++++++++++++++++++++
-
-echo "Shaper orientation angles (degrees):"
-read -a angles
-
-echo "Beam Energy (MeV):"
-read -a energies
-CHOICE="${energies[*]}"
-if [[ "$CHOICE" != "7" && "$CHOICE" != "9" && "$CHOICE" != "7 9" && "$CHOICE" != "9 7" ]]; then
-    echo 'Energy not available, choose "7" or "9" or "7 9"'
-    exit 1
-fi
-
-echo "Prescription dose [Gy] and volume [%]:"
-read -a preDV
-
-preD=${preDV[0]}
-preV=${preDV[1]}
-
-echo "How many primaries do you want to generate?"
-read primaries
-
-echo "How many CPUs are available?"
-read available_CPUs
-
-python3 starter_kit/eval_cpu.py -cpu "${available_CPUs}"  -A "${#angles[@]}"  -E "${#energies[@]}"  -P "${primaries}" > cpu_setup.out
-
-INPs=$(awk -F': ' '/INPs/{print $2}' cpu_setup.out)
-primaries_per_CPU=$(awk -F': ' '/PRIMARIES/{print $2}' cpu_setup.out)
-CPUs=$(awk -F': ' '/CPUs/{print $2}' cpu_setup.out)
-
-echo "You are using ${CPUs} CPUs, running ${primaries_per_CPU} per CPU"
-echo "Each setup (beam energy+shaper angle) simulation is distributed over ${INPs} CPUs"
-echo " "
-echo "Press any key to proceed or CMD+Z to exit"
-echo " "
-
-bash starter_kit/card_modifier.sh starter_kit/EF70mm_start.inp starter_kit/tmp.inp "START" 1 "${primaries_per_CPU}" 1
-mv starter_kit/tmp.inp starter_kit/EF70mm_start.inp
-
-read wait
-
-echo "Good luck!"
-
-
-#1. Get BEAM DIRECTION
-
-nohup python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
-pid=$!
-SPINNER_MSG="Computing beam direction"
-wait_with_spinner_and_report "$pid"
-
 
 output=$(grep "BEAM DIRECTION:" out.out | head -n 1)
 
@@ -212,11 +166,23 @@ width=8.0
 height=4.0
 echo "Slit size for 70mm applicator: ${width}x${height}cm^2"
 
-python3 starter_kit/GetFieldSize.py imgs/PTV_SH.mhd -rot "${angles[@]}" > rectangles.out &
+angles=(0 5 10 15 20 25 30 35 40 45 50 55 60 65 70 75 80 85)
 
+python3 starter_kit/GetFieldSize.py imgs/PTV_SH.mhd -rot "${angles[@]}" > rectangles.out &
 pid=$!
-SPINNER_MSG="Optimising geometry"
-wait_with_spinner_and_report "$pid"
+echo "Optimising geometry"
+
+  fail=0
+  if ! wait "$pid"; then
+    ((fail++))
+    echo "Process PID $pid terminated with an error"
+  fi
+
+  if (( fail == 0 )); then
+    echo "Process terminated successfully"
+  else
+    echo "$fail process terminated with an error"
+  fi
 
 echo "Geometry optimization details reported in rectangles.out"
 echo " "
@@ -239,7 +205,6 @@ cropZ=$(( idxPTVz - 1 )) #to make sure that the first slice of the PTV is not cu
 if ((cropZ<0)); then
     cropZ=0
 fi
-echo "CT cropping with such dimensions: ${dimX} ${dimY} ${cropZ} ${dimZ}"
 
 python3 starter_kit/mhd_crop.py \-i imgs/CT_SH.mhd \-o imgs/CT_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > crop.out
 python3 starter_kit/mhd_crop.py \-i imgs/PTV_SH.mhd \-o imgs/PTV_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > trash.out
@@ -286,19 +251,68 @@ read -r dimXcrop dimYcrop dimZcrop < <(echo "$output" | awk '{
     }
   }
 }')
+
+
+output=$(grep "new_L:" crop.out | head -n 1)
+read -r newLx newLy newLz < <(echo "$output" | awk '{
+  count = 0;
+  for (i=1; i<=NF; i++) {
+    if ($i ~ /^[-+]?[0-9]/) {
+      printf "%s ", $i;
+      count++;
+      if (count == 3) break;
+    }
+  }
+}')
 #*** ***
 
-echo "Cropped images dimensions: $dimXcrop $dimYcrop $dimZcrop"
+Xgrid=8 #cm     -Xgrid/2 |------0------| +Xgrid/2
+Ygrid=8 #cm     -Ygrid/2 |------0------| +Ygrid/2
+Zgrid=6 #cm            0 |-------------| +Zgrid
 
-bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 4 "${Xfcrop}" 1
-bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 5 "${Yfcrop}" 1
-bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 6 "${Zfcrop}" 1
-bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 1 "${X0crop}" 2
-bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 2 "${Y0crop}" 2
+python3 starter_kit/GetGridSize.py -ct imgs/CT_CROP.mhd -size ${Xgrid} ${Ygrid} ${Zgrid} > grid_size.out
+
+output=$(grep "grid_coord: " grid_size.out | head -n 1)
+read -r gridXin gridXf gridYin gridYf gridZin gridZf < <(echo "$output" | awk '{
+  count = 0;
+  for (i=1; i<=NF; i++) {
+    if ($i ~ /^[-+]?[0-9]/) {
+      printf "%s ", $i;
+      count++;
+      if (count == 6) break;
+    }
+  }
+}')
+
+
+output=$(grep "size_idx: " grid_size.out | head -n 1)
+read -r gridXidx gridYidx gridZidx < <(echo "$output" | awk '{
+  count = 0;
+  for (i=1; i<=NF; i++) {
+    if ($i ~ /^[-+]?[0-9]/) {
+      printf "%s ", $i;
+      count++;
+      if (count == 3) break;
+    }
+  }
+}')
+
+echo "Cropped images dimensions: $dimXcrop $dimYcrop $dimZcrop"
+echo "New images length: $newLx $newLy $newLz"
+echo "DOSE GRID SIZE: ${gridXidx} ${gridYidx} $gridZidx}" 
+echo "X: ${Xgrid} (${gridXin} ${gridXf}) [cm]" 
+echo "Y: ${Ygrid} (${gridYin} ${gridYf}) [cm]" 
+echo "Z: ${Zgrid} (${gridZin} ${gridZf}) [cm]" 
+
+bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 4 "${gridXf}" 1
+bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 5 "${gridYf}" 1
+bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 6 "${gridZf}" 1
+bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 1 "${gridXin}" 2
+bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 2 "${gridYin}" 2
 #bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 3 "${Z0crop}" 2 #dose map evaluated starting from 0 by default
-bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 4 "${dimXcrop}" 2
-bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 5 "${dimYcrop}" 2
-bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 6 "${dimZcrop}" 2
+bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 4 "${gridXidx}" 2
+bash starter_kit/card_modifier.sh starter_kit/EF70mm.inp starter_kit/tmpEF70mm.inp "USRBIN" 5 "${gridYidx}" 2
+bash starter_kit/card_modifier.sh starter_kit/tmpEF70mm.inp starter_kit/EF70mm.inp "USRBIN" 6 "${gridZidx}" 2
 
 X0voxels=$(echo "${X0crop} * -1" | bc -l)
 Y0voxels=$(echo "${Y0crop} * -1" | bc -l)
@@ -351,104 +365,141 @@ echo "CT, PTV and ROIs values converted to float32"
 
 Ws=()
 Hs=()
-for E in "${energies[@]}"; do
-for deg in "${angles[@]}"; do
-  read -r W < <(grep "Width_${deg}:" rectangles.out | awk '{
-    for(i=1; i <= NF; i++) {
-      if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
-        print $i; exit;
-      }
-    }
-  }')
-  Ws+=("$W")
 
-  read -r H < <(grep "Height_${deg}:" rectangles.out | awk '{
-    for(i=1; i <= NF; i++) {
-      if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
-        print $i; exit;
-      }
+read -r deg < <(grep "BEST_ANGLE:" rectangles.out | awk '{
+  for(i=1; i <= NF; i++) {
+    if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
+      print $i; exit;
     }
-  }')
-  Hs+=("$H")
+  }
+}')
+
+
+read -r W < <(grep "Width_${deg}:" rectangles.out | awk '{
+  for(i=1; i <= NF; i++) {
+    if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
+      print $i; exit;
+    }
+  }
+}')
+Ws+=("$W")
+
+read -r H < <(grep "Height_${deg}:" rectangles.out | awk '{
+  for(i=1; i <= NF; i++) {
+    if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
+      print $i; exit;
+    }
+  }
+}')
+Hs+=("$H")
+
+
+for E in "${energies[@]}"; do
+for slit in "${ape[@]}"; do
 
 # 4. MODIFY FLUKA file - field size
-  mkdir -p "sim${E}MeV_${deg}deg"
-  cp starter_kit/EF70mm.inp sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
+  mkdir -p "sim${E}MeV_${slit}p"
+  cp starter_kit/EF70mm.inp "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp"
 
-  Xi_right=$(echo "scale=3; $W / 2" | bc -l)
-  Xf_right=$(echo "scale=3; ${Xi_right} + ${height}" | bc -l) 
-  Xf_left=$(echo "scale=3; -1 * $W / 2" | bc -l)
-  Xi_left=$(echo "scale=3; ${Xf_left} - ${height}" | bc -l)
-  Yf_down=$(echo "scale=3; -1 * $H / 2" | bc -l)
-  Yi_down=$(echo "scale=3; ${Yf_down} - ${height}" | bc -l)
-  Yi_up=$(echo "scale=3; $H / 2" | bc -l)
-  Yf_up=$(echo "scale=3; ${Yi_up} + ${height}" | bc -l)
+  python3 starter_kit/GetPercentageAperture.py ${width} ${height} ${W} ${H} ${slit} > "sim${E}MeV_${slit}p/aperture.out"
+  read -r Xi_right Xf_right Xi_left Xf_left Yi_down Yf_down Yi_up Yf_up < <(
+  awk '/^APERTURE:/{ 
+    for(i=2;i<=NF;i++) 
+      if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) 
+        printf "%s ", $i; 
+    print ""
+  }' "sim${E}MeV_${slit}p/aperture.out"
+)
+
 #  echo "$Xi_right $Xf_right $Xi_left $Xf_left $Yi_down $Yf_down $Yi_up $Yf_up"
-#  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam4[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_right} ${Xf_right} /" sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam4[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_right} ${Xf_right} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
 
   # lam1: aggiorna Ymin (k=3) e Ymax (k=4)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
     RPP lam1 3 "${Yi_up}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
     RPP lam1 4 "${Yf_up}"
 
   # lam2: aggiorna Ymin (k=3) e Ymax (k=4)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
     RPP lam2 3 "${Yi_down}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
     RPP lam2 4 "${Yf_down}"
 
   # lam3: aggiorna Xmin (k=1) e Xmax (k=2)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
     RPP lam3 1 "${Xi_left}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
     RPP lam3 2 "${Xf_left}"
 
   # lam4: aggiorna Xmin (k=1) e Xmax (k=2)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
     RPP lam4 1 "${Xi_right}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${deg}deg/tmp.inp" \
-    "sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp" \
+    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
     RPP lam4 2 "${Xf_right}"
+
+  read -r Wfield Hfield < <(
+  awk '/^FIELD_SIZE:/{
+    for(i=2;i<=NF;i++)
+      if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/)
+        printf "%s ", $i;
+    print ""
+  }' "sim${E}MeV_${slit}p/aperture.out"
+)
+
+python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${Wfield}" -H "${Hfield}" -angle "${deg}" -showsave 1
+
+echo "---------------------------------------------------------------"
+echo "                         FIELD SIZE                            "
+echo "---------------------------------------------------------------"
+echo " "
+echo "                    WIDTH: ${Wfield} cm                        "
+echo "                   HEIGHT: ${Hfield} cm                        "
+echo " "
+echo "---------------------------------------------------------------"
+
 
 
 
 degRot=$(echo "${deg} * -1" | bc -l)
 
-  bash starter_kit/card_modifier.sh sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp sim${E}MeV_${deg}deg/tmp.inp "ROT-DEFI" 3 "${degRot}" 2
-  bash starter_kit/card_modifier.sh sim${E}MeV_${deg}deg/tmp.inp sim${E}MeV_${deg}deg/EF70mm${E}MeV_${deg}deg.inp "SOURCE" 7 "${E}MeV" 1
-  rm sim${E}MeV_${deg}deg/tmp.inp
-  cp imgs/CT.vxl sim${E}MeV_${deg}deg/CT.vxl
-  cp starter_kit/simkit${E}MeV/* sim${E}MeV_${deg}deg/
+  bash starter_kit/card_modifier.sh "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" "sim${E}MeV_${slit}p/tmp.inp" "ROT-DEFI" 3 "${degRot}" 2
+  bash starter_kit/card_modifier.sh "sim${E}MeV_${slit}p/tmp.inp" "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" "SOURCE" 7 "${E}MeV" 1
+  rm sim${E}MeV_${slit}p/tmp.inp
+  cp imgs/CT.vxl "sim${E}MeV_${slit}p/CT.vxl"
+  cp starter_kit/simkit${E}MeV/* "sim${E}MeV_${slit}p/"
 
-  cd sim${E}MeV_${deg}deg
-  bash crea_input_homemade.sh EF70mm${E}MeV_${deg}deg.inp ${INPs} > trash.out
-  echo "FLUKA input files created for ${E}MeV - ${deg}° treatment dose evaluation"
+
+
+  cd sim${E}MeV_${slit}p
+  bash crea_input_homemade.sh EF70mm${E}MeV_${slit}p.inp ${INPs} > trash.out
+  echo "FLUKA input files created for ${E}MeV - ${slit}   treatment dose evaluation"
   pids=()
   what_pid=()
   mkdir -p logs
   for run in $(seq 1 "${INPs}"); do
     nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
     pids+=($!)
-    what_pid+=("${E}MeV_${deg}°_run${run}")
+    what_pid+=("${E}MeV_${slit}p_run${run}")
   done
   printf "%s\n" "${pids[@]}" > processall.pid
   cd ..
@@ -484,8 +535,8 @@ done
 
 pids=()
 for E in "${energies[@]}"; do
-for deg in "${angles[@]}"; do
-  cd sim${E}MeV_${deg}deg
+for slit in "${ape[@]}"; do
+  cd sim${E}MeV_${slit}p
   for run in $(seq 1 "${INPs}")
   do
     nohup ./bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 & 
@@ -515,8 +566,8 @@ fi
 
 pids=()
 for E in "${energies[@]}"; do
-for deg in "${angles[@]}"; do
-  cd sim${E}MeV_${deg}deg
+for slit in "${ape[@]}"; do
+  cd sim${E}MeV_${slit}p
   check=(dose_tot_run*)
   if (( ${#check[@]} == 1 )); then
     cp "${check[0]}" dose_tot_run_copy.mhd
@@ -543,13 +594,15 @@ else
 fi
 pids=()
 for E in "${energies[@]}"; do
-for deg in "${angles[@]}"; do
-  cd sim${E}MeV_${deg}deg
+for slit in "${ape[@]}"; do
+  cd sim${E}MeV_${slit}p
   cp ../starter_kit/mhd_smooth.x ./
   ./mhd_smooth.x avg.mhd -o avg_smooth.mhd > trash.out
-  mv avg_smooth.mhd DOSE_${E}MeV_${deg}deg.mhd
+  mv avg_smooth.mhd DOSE_${E}MeV_${slit}p_GRID.mhd
 
-  python3 ../starter_kit/mhd_info.py -v DOSE_${E}MeV_${deg}deg.mhd > dose_info.out
+  python3 ../starter_kit/mhd_refill.py -ct ../imgs/CT_plan.mhd -dose DOSE_${E}MeV_${slit}p_GRID.mhd -out DOSE_${E}MeV_${slit}p.mhd
+  python3 ../starter_kit/mhd_astype.py DOSE_${E}MeV_${slit}p.mhd float32
+  python3 ../starter_kit/mhd_info.py -v DOSE_${E}MeV_${slit}p.mhd > dose_info.out
   output=$(grep "range=" dose_info.out | head -n 1)
 
   read -r min max < <(echo "$output" | awk '{
@@ -563,18 +616,21 @@ for deg in "${angles[@]}"; do
     }
   }')
 
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -divider ${max}
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -multiplier 50
-
-  echo "Creating dose map and DVH for ${E}MeV ${deg}°"
-  mkdir -p DVH${E}MeV_${deg}deg
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${deg}deg.mhd -type float -fileLabel ${E}MeV${deg}deg -dir DVH${E}MeV_${deg}deg > trash.out
-  cp ../starter_kit/find_prescription_point.py ./
-  rescale_factor=$(python3 find_prescription_point.py "DVH${E}MeV_${deg}deg/PTV_plan${E}MeV${deg}deg.txt" ${preD} ${preV})
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${deg}deg.mhd -multiplier "${rescale_factor}"
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${deg}deg.mhd -type float -fileLabel ${E}MeV${deg}deg -dir DVH${E}MeV_${deg}deg > trash.out
-  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV${deg}deg -dir1 DVH${E}MeV_${deg}deg -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV_${deg}deg.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
+#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -divider ${max}
+#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier 50
+#
+  echo "Creating dose map and DVH for ${E}MeV ${slit}p  "
+  mkdir -p DVH${E}MeV_${slit}p
+  rescale_factor=1.312875639e+13
+#  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
+#  cp ../starter_kit/find_prescription_point.py ./
+#  rescale_factor=$(python3 find_prescription_point.py "DVH${E}MeV_${slit}p/PTV_plan${E}MeV${slit}p.txt" ${preD} ${preV})
+#  echo "RESCALE FACTOR= ${rescale_factor}" > rescaling.out
+#  echo "TOTAL RESCALE= ${rescale_factor} x 50 x (1/${max})" >> rescaling.out
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${rescale_factor}"
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
+  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV${slit}p -dir1 DVH${E}MeV_${slit}p -roi PTV_plan "${ROIs_plan[@]}" > trash.out
+  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV_${slit}p.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
   cd ..
 done 
@@ -600,13 +656,27 @@ mv starter_kit/compare_all_DVHs.py ./
 python3 compare_all_DVHs.py --base-dir . --out DVH_ALL.png --legend right > trash.out
 pid="$!"
 
-SPINNER_MSG="Generating final plot"
-if ! wait_with_spinner_and_report "$pid"; then
-  continue
-fi
-mv compare_all_DVHs.py starter_kit/compare_all_DVHs.py
-echo "Wait just another moment and enjoy!"
-xdg-open DVH_ALL.png &
+echo "Generating final plot"
+
+  fail=0
+  if ! wait "$pid"; then
+    ((fail++))
+    echo "Process PID $pid terminated with an error"
+  fi
+
+  if (( fail == 0 )); then
+    echo "Process terminated successfully"
+  else
+    echo "$fail process terminated with an error"
+  fi
+
+mv compare_all_DVHs.py starter_kit/
+echo "Enjoy!"
+
+
+
+
+
 
 
 

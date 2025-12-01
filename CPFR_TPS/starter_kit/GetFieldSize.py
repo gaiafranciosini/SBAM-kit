@@ -181,6 +181,8 @@ def main():
     print(f"  Top: {best_rectangle['relative_coords']['top']:.2f} mm")
     print(f"  Area Difference: {best_rectangle['area_diff']:.2f} mm²")
 
+    print("BEST_ANGLE: "+str(best_rectangle['angle']))
+
     if args.plot:
         plot_results(projection, contour, rectangles, best_rectangle, isocenter, origin, spacing, args.rot)
 

@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+########################################################################
+########################################################################
+# Oct 2025 A.Burattini
+########################################################################
+########################################################################
+
+import argparse
+import numpy as np
+from mhd_io import *
+
+parser = argparse.ArgumentParser(
+    description='Get the size of a dose grid keeping the same spacing of the CT'
+)
+parser.add_argument("ct",   help="CT map",   required=True)
+parser.add_argument("dose", help="Dose map", required=True)
+parser.add_argument("out",  help="output map", required=True)
+
+args = parser.parse_args()
+
+ct   = args.ct
+dose = args.dose
+fout = args.out
+
+[nn_ct, hs_ct, x0_ct, Map_ct]=unpackVoxels(mhd_read(ct))
+[nn_dose, hs_dose, x0_dose, Map_dose]=unpackVoxels(mhd_read(dose))
+
+ct_val=np.array(Map_ct)
+dose_val=np.array(Map_dose)
+
+
+
