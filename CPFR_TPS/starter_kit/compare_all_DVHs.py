@@ -109,7 +109,7 @@ def make_single_figure(curves, out_path: str, legend_mode: str = "right", dpi: i
     # === Palette: stesso ROI -> stesso colore ===
     rois = sorted({c["roi"] for c in curves}, key=str.lower)
     # usa tab20 se >10 ROI, altrimenti tab10
-    cmap = plt.cm.get_cmap("tab20") if len(rois) > 10 else plt.cm.get_cmap("tab10")
+    cmap = plt.colormaps["tab20"] if len(rois) > 10 else plt.colormaps["tab10"]
     roi_color = {roi: cmap(i % cmap.N) for i, roi in enumerate(rois)}
 
     # === Stili: slit diverso -> stile diverso (linestyle+marker) ===

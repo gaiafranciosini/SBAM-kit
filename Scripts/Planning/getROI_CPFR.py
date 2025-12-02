@@ -155,12 +155,19 @@ def buildROI(rts,roiNum):
     myCont = []
     
     for cont in seq.ContourSequence:
-        print('.',end='',flush=True)        
-        Xcont = (+np.array(cont.ContourData[0::3]) - x0) / hx
-        Ycont = (+np.array(cont.ContourData[1::3]) - y0) / hy
+        print('.',end='',flush=True)
+        xContData = np.array(cont.ContourData[0::3])
+        if(xContData[0] < x0): 
+            Xcont = (+np.array(cont.ContourData[0::3]) + x0) / hx
+            Ycont = (+np.array(cont.ContourData[1::3]) + y0) / hy
+        else:
+            Xcont = (+np.array(cont.ContourData[0::3]) - x0) / hx
+            Ycont = (+np.array(cont.ContourData[1::3]) - y0) / hy
+            
 #        print("?? ",nx,ny,nz,x0,y0,hx,hy,sep='\t')
-#        print("?? ",Xcont,sep='\t')
-#        print("?? ",Ycont,sep='\t')
+#        print("Cont ",np.array(cont.ContourData[0::3]),sep='\t')
+#        print("Cont - offX ",Xcont,sep='\t')
+#        print("Cont - offY ",Ycont,sep='\t')
         
         lev=5 # oversampling level for voxels on the boundary (1-10)
         fillContourC(mask,ny,nx,Xcont,Ycont,len(Xcont),lev)

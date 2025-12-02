@@ -1,1 +1,0 @@
-/NFS_homes/alberto/SBAM-kit/Scripts/mhd_smooth/mhd_smooth.x
