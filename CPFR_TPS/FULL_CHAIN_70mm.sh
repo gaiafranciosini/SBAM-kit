@@ -72,6 +72,13 @@ while IFS= read -r line; do
 done < "$file"
 
 
+#CALIBRATION FACTORS (primaries/pulse)
+kFLASH_7MeV=9.382238805934787e+11
+kCONV_7MeV=1.42155133423254e+10
+kFLASH_9MeV=7.106140035174675e+11
+kCONV_9MeV=1.07668788411738e+10
+
+
 #1. Get BEAM DIRECTION
 
 nohup python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
@@ -469,7 +476,7 @@ for slit in "${ape[@]}"; do
 python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${Wfield}" -H "${Hfield}" -angle "${deg}" -showsave 1
 
 echo "---------------------------------------------------------------"
-echo "                         FIELD SIZE                            "
+echo "                      FIELD SIZE ${E}MeV                          "
 echo "---------------------------------------------------------------"
 echo " "
 echo "                    WIDTH: ${Wfield} cm                        "
@@ -496,11 +503,13 @@ degRot=$(echo "${deg} * -1" | bc -l)
   pids=()
   what_pid=()
   mkdir -p logs
-  for run in $(seq 1 "${INPs}"); do
-    nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
-    pids+=($!)
-    what_pid+=("${E}MeV_${slit}p_run${run}")
-  done
+
+    for run in $(seq 1 "${INPs}"); do
+        nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
+        pids+=($!)
+        what_pid+=("${E}MeV_${slit}p_run${run}")
+    done
+
   printf "%s\n" "${pids[@]}" > processall.pid
   cd ..
 
@@ -539,7 +548,7 @@ for slit in "${ape[@]}"; do
   cd sim${E}MeV_${slit}p
   for run in $(seq 1 "${INPs}")
   do
-    nohup ./bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 & 
+    nohup ../starter_kit/bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 & 
     pids+=("$!")
   done
   cd ..
@@ -572,7 +581,7 @@ for slit in "${ape[@]}"; do
   if (( ${#check[@]} == 1 )); then
     cp "${check[0]}" dose_tot_run_copy.mhd
   fi
-  nohup mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
+  nohup ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
 done 
@@ -621,13 +630,15 @@ for slit in "${ape[@]}"; do
 #
   echo "Creating dose map and DVH for ${E}MeV ${slit}p  "
   mkdir -p DVH${E}MeV_${slit}p
-  rescale_factor=1.312875639e+13
+#  rescale_factor=1.312875639e+13
 #  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
 #  cp ../starter_kit/find_prescription_point.py ./
 #  rescale_factor=$(python3 find_prescription_point.py "DVH${E}MeV_${slit}p/PTV_plan${E}MeV${slit}p.txt" ${preD} ${preV})
 #  echo "RESCALE FACTOR= ${rescale_factor}" > rescaling.out
 #  echo "TOTAL RESCALE= ${rescale_factor} x 50 x (1/${max})" >> rescaling.out
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${rescale_factor}"
+  factor="kFLASH_${E}MeV"
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${!factor}"
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier 10
   ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV${slit}p -dir1 DVH${E}MeV_${slit}p -roi PTV_plan "${ROIs_plan[@]}" > trash.out
   nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV_${slit}p.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &

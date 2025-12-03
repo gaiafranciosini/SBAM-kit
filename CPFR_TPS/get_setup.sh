@@ -4,6 +4,11 @@ echo "Additional slits aperture (%):"
 read -a ape
 echo "APERTURE: ${ape[@]}" > setup.out
 
+if (( ${#ape[@]} > 1 )); then
+    echo "ERROR: Please enter only ONE aperture value."
+    exit 1
+fi
+
 echo "Beam Energy (MeV):"
 read -a energies
 CHOICE="${energies[*]}"
@@ -30,6 +35,14 @@ echo "How many CPUs are available?"
 read available_CPUs
 echo "AVAILABLE CPUs: ${available_CPUs}" >> setup.out
 
+num_energies=${#energies[@]}
+
+if (( available_CPUs < num_energies )); then
+    echo "ERROR: You selected $num_energies energies but only $available_CPUs CPUs are available."
+    echo "Please provide at least as many CPUs as the number of energies."
+    exit 1
+fi
+
 python3 starter_kit/eval_cpu.py -cpu "${available_CPUs}"  -A "${#ape[@]}"  -E "${#energies[@]}"  -P "${primaries}" > cpu_setup.out
 
 INPs=$(awk -F': ' '/INPs/{print $2}' cpu_setup.out)
@@ -50,4 +63,4 @@ mv starter_kit/tmp.inp starter_kit/EF70mm_start.inp
 
 read wait
 
-echo "Good luck!"
+echo "Run: bash start_test.sh "
