@@ -18,6 +18,9 @@ if [[ "$CHOICE" != "7" && "$CHOICE" != "9" && "$CHOICE" != "7 9" && "$CHOICE" !=
 fi
 echo "ENERGY: ${energies[@]}" >> setup.out
 
+echo "Number of pulses:"
+read pulses
+echo "PULSES: ${pulses}" >> setup.out
 
 #echo "Prescription dose [Gy] and volume [%]:"
 #"read -a preDV
@@ -63,4 +66,5 @@ mv starter_kit/tmp.inp starter_kit/EF70mm_start.inp
 
 read wait
 
-echo "Run: bash start_test.sh "
+echo "Copy and customize: "
+echo "nohup bash FULL_CHAIN_70mm.sh setup.out imgs/<<Phantom.mhd>> imgs/<<PTV.mhd>> imgs/<<MARKER.mhd>> imgs/<<OAR1.mhd>> imgs/<<OAR2.mhd>> ... >full_log.txt 2>&1 & tail -f full_log.txt"

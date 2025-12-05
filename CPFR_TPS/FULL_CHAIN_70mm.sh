@@ -29,6 +29,7 @@ done
 # Inizializza variabili
 ape=()
 energies=()
+pulses=""
 #preD=""
 #preV=""
 primaries=""
@@ -46,6 +47,9 @@ while IFS= read -r line; do
             ;;
         "ENERGY:"*)
             energies=(${line#ENERGY: })
+            ;;
+        "PULSES:"*)
+            pulses=(${line#PULSES: })
             ;;
 #        "PERCENTAGE PRESCRIPTION DOSE:"*)
 #            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
@@ -638,7 +642,7 @@ for slit in "${ape[@]}"; do
 #  echo "TOTAL RESCALE= ${rescale_factor} x 50 x (1/${max})" >> rescaling.out
   factor="kFLASH_${E}MeV"
   python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${!factor}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier 10
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${pulses}"
   ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV${slit}p -dir1 DVH${E}MeV_${slit}p -roi PTV_plan "${ROIs_plan[@]}" > trash.out
   nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV_${slit}p.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
