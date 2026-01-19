@@ -77,7 +77,7 @@
       NOMORE = 0
 *  +-------------------------------------------------------------------*
 *  |  First call initializations:
-      WRITE (LUNOUT, *) 'ciaooooooooooooooooooooo'
+*      WRITE (LUNOUT, *) 'ciaooooooooooooooooooooo'
 *      WRITE (*, *) 'ciaooooooooooooooooooooo'
 *      CALL FLUSH(LUNOUT)
       IF ( LFIRST ) THEN
@@ -348,7 +348,7 @@ C      write(*,*) "vspec = ",vspec
 *     NREG (NPFLKA) = ...
 *  The following line makes the starting region search much more
 *  robust if particles are starting very close to a boundary:
-      CALL GEOCRS ( TXFLK (NPFLKA), TYFLK (NPFLKA), TZFLK (NPFLKA) )
+      CALL GEODRR ( TXFLK (NPFLKA), TYFLK (NPFLKA), TZFLK (NPFLKA) )
       CALL GEOREG ( XFLK  (NPFLKA), YFLK  (NPFLKA), ZFLK  (NPFLKA),
      &              NRGFLK(NPFLKA), IDISC )
 *  Do not change these cards:

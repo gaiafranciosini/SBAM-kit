@@ -10,9 +10,8 @@ if [ "$#" -lt 4 ]; then
   echo "Use: CT PTV MARKER [ROI1 ROI2 ROI3 ROI4 ...]"
   exit 1
 fi
-
+echo "$1 $2 $3 $4" > input_log.out
 shift 4
-
 # Array che conterr   i nomi puliti
 ROIs=()
 
@@ -24,10 +23,10 @@ for path in "$@"; do
   ROIs+=("$name")     # aggiunge all'array
 done
 #++++++++++++++++++++++++++++++++++
-
+echo "ROI: ${ROIs[@]}" >> input_log.out
 
 # Inizializza variabili
-ape=()
+#ape=0
 energies=()
 pulses=""
 #preD=""
@@ -41,10 +40,6 @@ CPUs=""
 # Legge il file riga per riga
 while IFS= read -r line; do
     case "$line" in
-        "APERTURE:"*)
-            # Estrai tutto dopo i due punti e converti in array
-            ape=(${line#APERTURE: })
-            ;;
         "ENERGY:"*)
             energies=(${line#ENERGY: })
             ;;
@@ -402,70 +397,87 @@ read -r H < <(grep "Height_${deg}:" rectangles.out | awk '{
     }
   }
 }')
-Hs+=("$H")
 
 
 for E in "${energies[@]}"; do
-for slit in "${ape[@]}"; do
+mkdir -p "sim${E}MeV"
+rm -f sim${E}MeV/*
+python3 starter_kit/GetBestSize.py -ptv imgs/PTV_plan.mhd -lutpath starter_kit/LUTs -min_size ${W} ${H} -E ${E} > "sim${E}MeV/field_size.out"
+#usage: GetBestSize.py [-h] -ptv path -lutpath path -min_size MIN_SIZE MIN_SIZE -E E
+
+read -r bestXsize < <(grep "Xsize:" sim${E}MeV/field_size.out | awk '{
+  for(i=1; i <= NF; i++) {
+    if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
+      print $i; exit;
+    }
+  }
+}')
+
+read -r bestYsize < <(grep "Ysize:" sim${E}MeV/field_size.out | awk '{
+  for(i=1; i <= NF; i++) {
+    if ($i ~ /^[+-]?[0-9]+(\.[0-9]+)?$/) {
+      print $i; exit;
+    }
+  }
+}')
 
 # 4. MODIFY FLUKA file - field size
-  mkdir -p "sim${E}MeV_${slit}p"
-  cp starter_kit/EF70mm.inp "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp"
+  cp starter_kit/EF70mm.inp "sim${E}MeV/EF70mm${E}MeV.inp"
 
-  python3 starter_kit/GetPercentageAperture.py ${width} ${height} ${W} ${H} ${slit} > "sim${E}MeV_${slit}p/aperture.out"
+  python3 starter_kit/GetSlitMargins.py ${width} ${height} ${bestXsize} ${bestYsize} > "sim${E}MeV/aperture.out"
   read -r Xi_right Xf_right Xi_left Xf_left Yi_down Yf_down Yi_up Yf_up < <(
   awk '/^APERTURE:/{ 
     for(i=2;i<=NF;i++) 
       if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) 
         printf "%s ", $i; 
     print ""
-  }' "sim${E}MeV_${slit}p/aperture.out"
+  }' "sim${E}MeV/aperture.out"
 )
 
 #  echo "$Xi_right $Xf_right $Xi_left $Xf_left $Yi_down $Yf_down $Yi_up $Yf_up"
-#  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam4[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_right} ${Xf_right} /" sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV/EF70mm${E}MeV.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV/EF70mm${E}MeV.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV/EF70mm${E}MeV.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam4[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_right} ${Xf_right} /" sim${E}MeV/EF70mm${E}MeV.inp 
 
   # lam1: aggiorna Ymin (k=3) e Ymax (k=4)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
-    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
+    "sim${E}MeV/tmp.inp" \
     RPP lam1 3 "${Yi_up}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/tmp.inp" \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
     RPP lam1 4 "${Yf_up}"
 
   # lam2: aggiorna Ymin (k=3) e Ymax (k=4)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
-    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
+    "sim${E}MeV/tmp.inp" \
     RPP lam2 3 "${Yi_down}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/tmp.inp" \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
     RPP lam2 4 "${Yf_down}"
 
   # lam3: aggiorna Xmin (k=1) e Xmax (k=2)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
-    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
+    "sim${E}MeV/tmp.inp" \
     RPP lam3 1 "${Xi_left}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/tmp.inp" \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
     RPP lam3 2 "${Xf_left}"
 
   # lam4: aggiorna Xmin (k=1) e Xmax (k=2)
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
-    "sim${E}MeV_${slit}p/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
+    "sim${E}MeV/tmp.inp" \
     RPP lam4 1 "${Xi_right}"
   bash starter_kit/object_card_modifier.sh \
-    "sim${E}MeV_${slit}p/tmp.inp" \
-    "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" \
+    "sim${E}MeV/tmp.inp" \
+    "sim${E}MeV/EF70mm${E}MeV.inp" \
     RPP lam4 2 "${Xf_right}"
 
   read -r Wfield Hfield < <(
@@ -474,17 +486,17 @@ for slit in "${ape[@]}"; do
       if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/)
         printf "%s ", $i;
     print ""
-  }' "sim${E}MeV_${slit}p/aperture.out"
+  }' "sim${E}MeV/aperture.out"
 )
 
-python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${Wfield}" -H "${Hfield}" -angle "${deg}" -showsave 1
+python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${bestXsize}" -H "${bestYsize}" -angle "${deg}" -showsave 1
 
 echo "---------------------------------------------------------------"
-echo "                      FIELD SIZE ${E}MeV                          "
+echo "                      FIELD SIZE ${E}MeV                       "
 echo "---------------------------------------------------------------"
 echo " "
-echo "                    WIDTH: ${Wfield} cm                        "
-echo "                   HEIGHT: ${Hfield} cm                        "
+echo "                    WIDTH: ${bestXsize} cm                     "
+echo "                   HEIGHT: ${bestYsize} cm                     "
 echo " "
 echo "---------------------------------------------------------------"
 
@@ -493,17 +505,17 @@ echo "---------------------------------------------------------------"
 
 degRot=$(echo "${deg} * -1" | bc -l)
 
-  bash starter_kit/card_modifier.sh "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" "sim${E}MeV_${slit}p/tmp.inp" "ROT-DEFI" 3 "${degRot}" 2
-  bash starter_kit/card_modifier.sh "sim${E}MeV_${slit}p/tmp.inp" "sim${E}MeV_${slit}p/EF70mm${E}MeV_${slit}p.inp" "SOURCE" 7 "${E}MeV" 1
-  rm sim${E}MeV_${slit}p/tmp.inp
-  cp imgs/CT.vxl "sim${E}MeV_${slit}p/CT.vxl"
-  cp starter_kit/simkit${E}MeV/* "sim${E}MeV_${slit}p/"
+  bash starter_kit/card_modifier.sh "sim${E}MeV/EF70mm${E}MeV.inp" "sim${E}MeV/tmp.inp" "ROT-DEFI" 3 "${degRot}" 2
+  bash starter_kit/card_modifier.sh "sim${E}MeV/tmp.inp" "sim${E}MeV/EF70mm${E}MeV.inp" "SOURCE" 7 "${E}MeV" 1
+  rm sim${E}MeV/tmp.inp
+  cp imgs/CT.vxl "sim${E}MeV/CT.vxl"
+  cp starter_kit/simkit${E}MeV/* "sim${E}MeV/"
 
 
 
-  cd sim${E}MeV_${slit}p
-  bash crea_input_homemade.sh EF70mm${E}MeV_${slit}p.inp ${INPs} > trash.out
-  echo "FLUKA input files created for ${E}MeV - ${slit}   treatment dose evaluation"
+  cd sim${E}MeV
+  bash crea_input_homemade.sh EF70mm${E}MeV.inp ${INPs} > trash.out
+  echo "FLUKA input files created for ${E}MeV treatment dose evaluation"
   pids=()
   what_pid=()
   mkdir -p logs
@@ -511,13 +523,12 @@ degRot=$(echo "${deg} * -1" | bc -l)
     for run in $(seq 1 "${INPs}"); do
         nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
         pids+=($!)
-        what_pid+=("${E}MeV_${slit}p_run${run}")
+        what_pid+=("${E}MeV_run${run}")
     done
 
   printf "%s\n" "${pids[@]}" > processall.pid
   cd ..
 
-done
 done
 
 echo "Waiting all the simulations to be completed"
@@ -548,8 +559,7 @@ done
 
 pids=()
 for E in "${energies[@]}"; do
-for slit in "${ape[@]}"; do
-  cd sim${E}MeV_${slit}p
+  cd sim${E}MeV
   for run in $(seq 1 "${INPs}")
   do
     nohup ../starter_kit/bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 & 
@@ -557,7 +567,6 @@ for slit in "${ape[@]}"; do
   done
   cd ..
 done 
-done
 
 echo "Waiting all .bnn files to be converted to .mhd maps"
 fail=0
@@ -579,8 +588,7 @@ fi
 
 pids=()
 for E in "${energies[@]}"; do
-for slit in "${ape[@]}"; do
-  cd sim${E}MeV_${slit}p
+  cd sim${E}MeV
   check=(dose_tot_run*)
   if (( ${#check[@]} == 1 )); then
     cp "${check[0]}" dose_tot_run_copy.mhd
@@ -589,7 +597,6 @@ for slit in "${ape[@]}"; do
   pids+=("$!")
   cd ..
 done 
-done
 
 echo "Waiting maps to be combined"
 fail=0
@@ -607,15 +614,14 @@ else
 fi
 pids=()
 for E in "${energies[@]}"; do
-for slit in "${ape[@]}"; do
-  cd sim${E}MeV_${slit}p
+  cd sim${E}MeV
   cp ../starter_kit/mhd_smooth.x ./
   ./mhd_smooth.x avg.mhd -o avg_smooth.mhd > trash.out
-  mv avg_smooth.mhd DOSE_${E}MeV_${slit}p_GRID.mhd
+  mv avg_smooth.mhd DOSE_${E}MeV_GRID.mhd
 
-  python3 ../starter_kit/mhd_refill.py -ct ../imgs/CT_plan.mhd -dose DOSE_${E}MeV_${slit}p_GRID.mhd -out DOSE_${E}MeV_${slit}p.mhd
-  python3 ../starter_kit/mhd_astype.py DOSE_${E}MeV_${slit}p.mhd float32
-  python3 ../starter_kit/mhd_info.py -v DOSE_${E}MeV_${slit}p.mhd > dose_info.out
+  python3 ../starter_kit/mhd_refill.py -ct ../imgs/CT_plan.mhd -dose DOSE_${E}MeV_GRID.mhd -out DOSE_${E}MeV.mhd
+  python3 ../starter_kit/mhd_astype.py DOSE_${E}MeV.mhd float32
+  python3 ../starter_kit/mhd_info.py -v DOSE_${E}MeV.mhd > dose_info.out
   output=$(grep "range=" dose_info.out | head -n 1)
 
   read -r min max < <(echo "$output" | awk '{
@@ -629,27 +635,23 @@ for slit in "${ape[@]}"; do
     }
   }')
 
-#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -divider ${max}
-#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier 50
+#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider ${max}
+#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier 50
 #
-  echo "Creating dose map and DVH for ${E}MeV ${slit}p  "
-  mkdir -p DVH${E}MeV_${slit}p
-#  rescale_factor=1.312875639e+13
-#  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
-#  cp ../starter_kit/find_prescription_point.py ./
-#  rescale_factor=$(python3 find_prescription_point.py "DVH${E}MeV_${slit}p/PTV_plan${E}MeV${slit}p.txt" ${preD} ${preV})
+  echo "Creating dose map and DVH for ${E}MeV"
+  mkdir -p DVH${E}MeV
 #  echo "RESCALE FACTOR= ${rescale_factor}" > rescaling.out
 #  echo "TOTAL RESCALE= ${rescale_factor} x 50 x (1/${max})" >> rescaling.out
   factor="kFLASH_${E}MeV"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${!factor}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_${slit}p.mhd -multiplier "${pulses}"
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_${slit}p.mhd -type float -fileLabel ${E}MeV${slit}p -dir DVH${E}MeV_${slit}p > trash.out
-  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV${slit}p -dir1 DVH${E}MeV_${slit}p -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV_${slit}p.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${!factor}"
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV > trash.out
+  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV -roi PTV_plan "${ROIs_plan[@]}" > trash.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV/PTV_plan${E}MeV.txt > DVH_${E}MeV/DVH_PTV.out
+#  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
   cd ..
 done 
-done
 
 echo "Waiting png images to be created and saved"
 fail=0

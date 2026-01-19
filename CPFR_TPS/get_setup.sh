@@ -1,14 +1,5 @@
 #!/bin/bash
 
-echo "Additional slits aperture (%):"
-read -a ape
-echo "APERTURE: ${ape[@]}" > setup.out
-
-if (( ${#ape[@]} > 1 )); then
-    echo "ERROR: Please enter only ONE aperture value."
-    exit 1
-fi
-
 echo "Beam Energy (MeV):"
 read -a energies
 CHOICE="${energies[*]}"
@@ -16,7 +7,7 @@ if [[ "$CHOICE" != "7" && "$CHOICE" != "9" && "$CHOICE" != "7 9" && "$CHOICE" !=
     echo 'Energy not available, choose "7" or "9" or "7 9"'
     exit 1
 fi
-echo "ENERGY: ${energies[@]}" >> setup.out
+echo "ENERGY: ${energies[@]}" > setup.out
 
 echo "Number of pulses:"
 read pulses
@@ -46,7 +37,7 @@ if (( available_CPUs < num_energies )); then
     exit 1
 fi
 
-python3 starter_kit/eval_cpu.py -cpu "${available_CPUs}"  -A "${#ape[@]}"  -E "${#energies[@]}"  -P "${primaries}" > cpu_setup.out
+python3 starter_kit/eval_cpu.py -cpu "${available_CPUs}" -E "${#energies[@]}"  -P "${primaries}" > cpu_setup.out
 
 INPs=$(awk -F': ' '/INPs/{print $2}' cpu_setup.out)
 echo "INP FILES: ${INPs}" >> setup.out
