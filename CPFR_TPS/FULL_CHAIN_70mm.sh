@@ -613,6 +613,7 @@ else
   echo "$fail process(es) terminated with an error"
 fi
 pids=()
+DVHdirs=()
 for E in "${energies[@]}"; do
   cd sim${E}MeV
   cp ../starter_kit/mhd_smooth.x ./
@@ -639,15 +640,17 @@ for E in "${energies[@]}"; do
 #  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier 50
 #
   echo "Creating dose map and DVH for ${E}MeV"
-  mkdir -p DVH${E}MeV
+  mkdir -p DVH${E}MeV_${pulses}pulses
 #  echo "RESCALE FACTOR= ${rescale_factor}" > rescaling.out
 #  echo "TOTAL RESCALE= ${rescale_factor} x 50 x (1/${max})" >> rescaling.out
   factor="kFLASH_${E}MeV"
   python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${!factor}"
   python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV > trash.out
-  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV/PTV_plan${E}MeV.txt > DVH_${E}MeV/DVH_PTV.out
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV_${pulses}pulses > trash.out
+  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV_${pulses}pulses -roi PTV_plan "${ROIs_plan[@]}" > trash.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_${pulses}pulses/PTV_plan${E}MeV.txt > DVH${E}MeV_${pulses}pulses/DVH_PTV.out
+
+  DVHdirs+=("sim${E}MeV/DVH${E}MeV_${pulses}pulses")
 #  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
   cd ..
@@ -669,25 +672,8 @@ else
 fi
 
 
-mv starter_kit/compare_all_DVHs.py ./
-python3 compare_all_DVHs.py --base-dir . --out DVH_ALL.png --legend right > trash.out
-pid="$!"
+python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --out "./DVH_ALL.png"
 
-echo "Generating final plot"
-
-  fail=0
-  if ! wait "$pid"; then
-    ((fail++))
-    echo "Process PID $pid terminated with an error"
-  fi
-
-  if (( fail == 0 )); then
-    echo "Process terminated successfully"
-  else
-    echo "$fail process terminated with an error"
-  fi
-
-mv compare_all_DVHs.py starter_kit/
 echo "Enjoy!"
 
 

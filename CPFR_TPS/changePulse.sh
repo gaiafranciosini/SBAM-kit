@@ -1,6 +1,7 @@
 #!/bin/bash
 #++++++++++++++++++++++++++++++++++
-new_pulses=$1
+echo "New number of pulses:"
+read new_pulses
 input="input_log.out"
 read -r file CT PTV MARKER rest < "$input"
 read -r _ roi_line < <(grep '^ROI:' "$input")
@@ -83,14 +84,38 @@ for E in "${energies[@]}"; do
   ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV_${new_pulses}pulses > trash.out
   echo "New DVH curves created"
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV_${new_pulses}pulses -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_${new_pulses}pulses/PTV_plan${E}MeV.txt > DVH_${E}MeV_${new_pulses}pulses/DVH_PTV.out
-  mv 9MeV.png 9MeV_${new_pulses}pulses.png
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_${new_pulses}pulses/PTV_plan${E}MeV.txt > DVH${E}MeV_${new_pulses}pulses/DVH_PTV.out
+#  mv ${E}MeV.png ${E}MeV_${new_pulses}pulses.png
   echo "DVH plot saved"
   pids+=("$!")
   cd ..
   echo " "
 done 
 
+ex_pulses=${pulses}
+pulses=(${ex_pulses} ${new_pulses})
+
+dirs=()
+plotname="DVH_"
+for E in "${energies[@]}"; do
+plotname+="${E}_"
+done
+plotname+="MeV_"
+for P in "${pulses[@]}"; do
+plotname+="${P}_"
+done
+plotname+="pulses.png"
+
+for E in "${energies[@]}"; do
+for P in "${pulses[@]}"; do
+dirs+=("sim${E}MeV/DVH${E}MeV_${P}pulses")
+done
+done
+
+python3 starter_kit/GetDVHPlot.py "${dirs[@]}" --out "./${plotname}"
+echo "${plotname} generated"
+echo "To compare DVHs with other energies or pulses values use:" 
+echo "bash newDVHplot.sh"
 
 
 
