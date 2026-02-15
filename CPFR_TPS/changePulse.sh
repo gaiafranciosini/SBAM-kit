@@ -10,7 +10,7 @@ ROIs=(${roi_line#ROI: })
 # Inizializza variabili
 #ape=0
 energies=()
-pulses=""
+pulses=1
 #preD=""
 #preV=""
 primaries=""
@@ -25,15 +25,15 @@ while IFS= read -r line; do
         "ENERGY:"*)
             energies=(${line#ENERGY: })
             ;;
-        "PULSES:"*)
-            pulses=(${line#PULSES: })
+#        "PULSES:"*)
+#            pulses=(${line#PULSES: })
+#            ;;
+        "PERCENTAGE PRESCRIPTION DOSE:"*)
+            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
             ;;
-#        "PERCENTAGE PRESCRIPTION DOSE:"*)
-#            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
-#            ;;
-#        "PERCENTAGE PRESCRIPTION VOLUME:"*)
-#            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
-#            ;;
+        "PERCENTAGE PRESCRIPTION VOLUME:"*)
+            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
+            ;;
         "PRIMARIES:"*)
             primaries=${line#PRIMARIES: }
             ;;
@@ -78,6 +78,7 @@ for E in "${energies[@]}"; do
   [[ -f ${E}MeV.png ]] && mv ${E}MeV.png ${E}MeV_${pulses}pulses.png
   [[ -f DOSE_${E}MeV.mhd ]] && cp DOSE_${E}MeV.mhd DOSE_${E}MeV_${pulses}pulses.mhd
   mkdir "DVH${E}MeV_${new_pulses}pulses"
+  
   python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider "${pulses}"
   python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${new_pulses}"
   echo "Map rescaled"
@@ -85,6 +86,9 @@ for E in "${energies[@]}"; do
   echo "New DVH curves created"
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV_${new_pulses}pulses -roi PTV_plan "${ROIs_plan[@]}" > trash.out
   python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_${new_pulses}pulses/PTV_plan${E}MeV.txt > DVH${E}MeV_${new_pulses}pulses/DVH_PTV.out
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider "${new_pulses}"
+  
 #  mv ${E}MeV.png ${E}MeV_${new_pulses}pulses.png
   echo "DVH plot saved"
   pids+=("$!")

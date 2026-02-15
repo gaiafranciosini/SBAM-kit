@@ -9,17 +9,17 @@ if [[ "$CHOICE" != "7" && "$CHOICE" != "9" && "$CHOICE" != "7 9" && "$CHOICE" !=
 fi
 echo "ENERGY: ${energies[@]}" > setup.out
 
-echo "Number of pulses:"
-read pulses
-echo "PULSES: ${pulses}" >> setup.out
+#echo "Number of pulses:"
+#read pulses
+#echo "PULSES: ${pulses}" >> setup.out
 
-#echo "Prescription dose [Gy] and volume [%]:"
-#"read -a preDV
-#
-#preD=${preDV[0]}
-#preV=${preDV[1]}
-#echo "PERCENTAGE PRESCRIPTION DOSE: ${preD}" >> setup.out
-#echo "PERCENTAGE PRESCRIPTION VOLUME: ${preV}" >> setup.out
+echo "Prescription dose [Gy] and volume [%]:"
+read -a preDV
+
+preD=${preDV[0]}
+preV=${preDV[1]}
+echo "PERCENTAGE PRESCRIPTION DOSE: ${preD}" >> setup.out
+echo "PERCENTAGE PRESCRIPTION VOLUME: ${preV}" >> setup.out
 
 echo "How many primaries do you want to generate?"
 read primaries

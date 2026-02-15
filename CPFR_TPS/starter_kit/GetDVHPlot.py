@@ -201,12 +201,16 @@ def main() -> None:
 
     plotted = 0
     errors: List[str] = []
-
+    xmax=0
     for fpath in files:
         try:
             x, y = read_dvh_txt(fpath)
+            mask=y > 0.001
+            if (max(x[mask])>xmax):
+              xmax = max(x[mask])
+              print(xmax)
             label = make_label(fpath, args.label_mode)
-            ax.plot(x, y, linewidth=2.0, label=label)
+            ax.plot(x[mask], y[mask], linewidth=2.0, label=label)
             plotted += 1
         except Exception as e:
             errors.append(f"{fpath}: {e}")
@@ -219,6 +223,7 @@ def main() -> None:
     ax.set_title(args.title, fontsize=18, pad=12)
     ax.set_xlabel(xlabel, fontsize=15, labelpad=10)
     ax.set_ylabel(ylabel, fontsize=15, labelpad=10)
+    ax.set_xlim(0, 1.01*xmax)
     ax.tick_params(axis="both", which="major", labelsize=13)
     ax.grid(True, which="both", alpha=0.25)
 

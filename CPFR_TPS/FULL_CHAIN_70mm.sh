@@ -28,9 +28,9 @@ echo "ROI: ${ROIs[@]}" >> input_log.out
 # Inizializza variabili
 #ape=0
 energies=()
-pulses=""
-#preD=""
-#preV=""
+#pulses=""
+preD=""
+preV=""
 primaries=""
 available_CPUs=""
 INPs=""
@@ -43,15 +43,15 @@ while IFS= read -r line; do
         "ENERGY:"*)
             energies=(${line#ENERGY: })
             ;;
-        "PULSES:"*)
-            pulses=(${line#PULSES: })
+#        "PULSES:"*)
+#            pulses=(${line#PULSES: })
+#            ;;
+        "PERCENTAGE PRESCRIPTION DOSE:"*)
+            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
             ;;
-#        "PERCENTAGE PRESCRIPTION DOSE:"*)
-#            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
-#            ;;
-#        "PERCENTAGE PRESCRIPTION VOLUME:"*)
-#            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
-#            ;;
+        "PERCENTAGE PRESCRIPTION VOLUME:"*)
+            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
+            ;;
         "PRIMARIES:"*)
             primaries=${line#PRIMARIES: }
             ;;
@@ -640,20 +640,27 @@ for E in "${energies[@]}"; do
 #  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier 50
 #
   echo "Creating dose map and DVH for ${E}MeV"
-  mkdir -p DVH${E}MeV_${pulses}pulses
-#  echo "RESCALE FACTOR= ${rescale_factor}" > rescaling.out
-#  echo "TOTAL RESCALE= ${rescale_factor} x 50 x (1/${max})" >> rescaling.out
+  mkdir -p DVH${E}MeV
   factor="kFLASH_${E}MeV"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${!factor}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV_${pulses}pulses > trash.out
-  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV_${pulses}pulses -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_${pulses}pulses/PTV_plan${E}MeV.txt > DVH${E}MeV_${pulses}pulses/DVH_PTV.out
-
-  DVHdirs+=("sim${E}MeV/DVH${E}MeV_${pulses}pulses")
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${!factor}"   # 1pulse
+  cp DOSE_${E}MeV.mhd DOSE_${E}MeV_1pulses.mhd
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV > trash.out
+  pulses=$(python3 ../starter_kit/findPulses.py DVH${E}MeV/PTV_plan${E}MeV.txt ${preD} ${preV} )
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"   
+  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV > trash.out
+  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV -roi PTV_plan "${ROIs_plan[@]}" > trash.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV/PTV_plan${E}MeV.txt > DVH${E}MeV/DVH_PTV.out
+  cp DOSE_${E}MeV.mhd DOSE_${E}MeV_${pulses}pulses.mhd
+  DVHdirs+=("sim${E}MeV/DVH${E}MeV")
 #  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
   cd ..
+
+echo "---------------------------------------------------------------"
+echo "                   PULSES ${E}MeV: ${pulses}                   "
+echo "---------------------------------------------------------------"
+
+
 done 
 
 echo "Waiting png images to be created and saved"
@@ -672,7 +679,7 @@ else
 fi
 
 
-python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --out "./DVH_ALL.png"
+python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL.png"
 
 echo "Enjoy!"
 
