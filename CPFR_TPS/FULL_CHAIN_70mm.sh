@@ -1,6 +1,7 @@
 #!/bin/bash
 #++++++++++++++++++++++++++++++++++
 
+
 file="$1"
 CT="$2"
 PTV="$3"
@@ -640,24 +641,40 @@ for E in "${energies[@]}"; do
 #  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier 50
 #
   echo "Creating dose map and DVH for ${E}MeV"
-  mkdir -p DVH${E}MeV
-  factor="kFLASH_${E}MeV"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${!factor}"   # 1pulse
-  cp DOSE_${E}MeV.mhd DOSE_${E}MeV_1pulses.mhd
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV > trash.out
-  pulses=$(python3 ../starter_kit/findPulses.py DVH${E}MeV/PTV_plan${E}MeV.txt ${preD} ${preV} )
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"   
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV > trash.out
-  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV/PTV_plan${E}MeV.txt > DVH${E}MeV/DVH_PTV.out
-  cp DOSE_${E}MeV.mhd DOSE_${E}MeV_${pulses}pulses.mhd
-  DVHdirs+=("sim${E}MeV/DVH${E}MeV")
+  mkdir -p DVH${E}MeV_FLASH
+  mkdir -p DVH${E}MeV_CONV
+  factor_FLASH="kFLASH_${E}MeV"
+  factor_CONV="kCONV_${E}MeV"
+
+  cp DOSE_${E}MeV.mhd DOSE_${E}MeV_FLASH.mhd
+  mv DOSE_${E}MeV.mhd DOSE_${E}MeV_CONV.mhd
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${!factor_FLASH}"   # 1pulse
+  cp DOSE_${E}MeV_FLASH.mhd DOSE_${E}MeV_1pulses_FLASH.mhd
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${!factor_CONV}"   # 1pulse
+  cp DOSE_${E}MeV_CONV.mhd DOSE_${E}MeV_1pulses_CONV.mhd
+  ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_FLASH.mhd -type float -fileLabel ${E}MeV_FLASH -dir DVH${E}MeV_FLASH --binningDVH 10000 > trash.out
+  ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_CONV.mhd -type float -fileLabel ${E}MeV_CONV -dir DVH${E}MeV_CONV --binningDVH 10000 > trash.out
+  pulses_FLASH=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt ${preD} ${preV} )
+  pulses_CONV=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt ${preD} ${preV} )
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${pulses_FLASH}"
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${pulses_CONV}"  
+  ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_FLASH.mhd -type float -fileLabel ${E}MeV_FLASH -dir DVH${E}MeV_FLASH --binningDVH 1000  > trash.out
+  ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_CONV.mhd -type float -fileLabel ${E}MeV_CONV -dir DVH${E}MeV_CONV --binningDVH 1000  > trash.out
+  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV_FLASH -dir1 DVH${E}MeV_FLASH -roi PTV_plan "${ROIs_plan[@]}" > trash.out
+  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV_CONV -dir1 DVH${E}MeV_CONV -roi PTV_plan "${ROIs_plan[@]}" > trash.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt > DVH${E}MeV_FLASH/DVH_PTV_FLASH.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt > DVH${E}MeV_CONV/DVH_PTV_CONV.out
+  cp DOSE_${E}MeV_FLASH.mhd DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd
+  cp DOSE_${E}MeV_CONV.mhd DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd
+  DVHdirs+=("sim${E}MeV/DVH${E}MeV_FLASH")
+  DVHdirs+=("sim${E}MeV/DVH${E}MeV_CONV")
 #  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
   cd ..
 
 echo "---------------------------------------------------------------"
-echo "                   PULSES ${E}MeV: ${pulses}                   "
+echo "                   PULSES ${E}MeV FLASH: ${pulses_FLASH}       "
+echo "                   PULSES ${E}MeV CONV: ${pulses_CONV}         "
 echo "---------------------------------------------------------------"
 
 
@@ -677,7 +694,8 @@ if ((fail==0)); then
 else
   echo "$fail process(es) terminated with an error"
 fi
-
+echo "DVHdirs content:"
+printf "%s\n" "${DVHdirs[@]}"
 
 python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL.png"
 

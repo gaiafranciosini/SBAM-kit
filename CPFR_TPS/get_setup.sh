@@ -29,6 +29,8 @@ echo "How many CPUs are available?"
 read available_CPUs
 echo "AVAILABLE CPUs: ${available_CPUs}" >> setup.out
 
+
+
 num_energies=${#energies[@]}
 
 if (( available_CPUs < num_energies )); then
@@ -45,7 +47,6 @@ primaries_per_CPU=$(awk -F': ' '/PRIMARIES/{print $2}' cpu_setup.out)
 echo "PRIMARIES PER CPU: ${primaries_per_CPU}" >> setup.out
 CPUs=$(awk -F': ' '/CPUs/{print $2}' cpu_setup.out)
 echo "USED CPUs: ${CPUs}" >> setup.out
-
 echo "You are using ${CPUs} CPUs, running ${primaries_per_CPU} per CPU"
 echo "Each setup (beam energy+slits aperture) simulation is distributed over ${INPs} CPUs"
 echo " "
