@@ -594,7 +594,7 @@ for E in "${energies[@]}"; do
   if (( ${#check[@]} == 1 )); then
     cp "${check[0]}" dose_tot_run_copy.mhd
   fi
-  nohup ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
+  nohup python3 ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
 done 
