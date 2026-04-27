@@ -26,15 +26,13 @@ int main(int argc, char *argv[]) {
     int nn[3];
     float x0[3], L[3], hs[3];
     float left[3], up[3], front[3];
-    int binningDVH = 100;
+    int binningDVH = 200;
     bool plot = false;
     string allROINames = "";
 
     for (int i = 1; i < argc; ++i) {
         string arg = argv[i];
-        if (arg == "-Dgoal" && i + 1 < argc) {
-            Dgoal = std::stof(argv[++i]);
-        } else if (arg == "-plot") {
+        if (arg == "-plot") {
             plot = true;
         } else if (arg == "-roi") {
             while (i + 1 < argc && argv[i + 1][0] != '-') {
@@ -55,7 +53,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (Dgoal == 0.0f || filename.empty() || dosefile.empty() || roitype.empty() || fileLabel.empty()) {
+    if (filename.empty() || dosefile.empty() || roitype.empty() || fileLabel.empty()) {
         std::cerr << "Error: Missing required arguments." << std::endl;
         return 1;
     }
@@ -120,7 +118,7 @@ int main(int argc, char *argv[]) {
         float maxDose = 0;
         for(double d : D_masked) if(d > maxDose) maxDose = d;
         
-        float binSize = Dgoal / binningDVH;
+        float binSize = binningDVH;
         int nbin = static_cast<int>(maxDose / binSize) + 2;
         if(nbin < binningDVH) nbin = binningDVH;
 
