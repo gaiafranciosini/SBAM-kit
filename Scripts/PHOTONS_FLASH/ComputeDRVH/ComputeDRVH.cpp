@@ -70,6 +70,9 @@ int main(int argc, char *argv[]) {
         dose[i] /= T;
     }
 
+    string doseRateOut = dir + "/DoseRate" + fileLabel + ".mhd";
+    cout << "Saving DoseRate field to: " << doseRateOut << endl;
+    
     for (int i = 0; i < 3; i++) {
         L[i] /= 10.0;
         x0[i] /= 10.0;
