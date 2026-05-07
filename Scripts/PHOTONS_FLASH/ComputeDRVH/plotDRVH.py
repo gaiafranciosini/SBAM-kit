@@ -18,10 +18,10 @@ my_Color = ['r','g','b','k','y','c','m','tab:orange','tab:purple','tab:pink','ta
 
 # Configurazione font e figura
 plt.rcParams.update({'font.size': 15})
-fig = plt.figure(figsize=(8, 8))
+fig = plt.figure(figsize=(6, 6))
 ax1 = plt.subplot(111)
 
-plt.xlabel('Dose [Gy/s]', fontsize=15)
+plt.xlabel('Dose rate [Gy/s]', fontsize=15)
 plt.ylabel('Volume [%]', fontsize=15)
 
 # Loop per il plot delle ROI

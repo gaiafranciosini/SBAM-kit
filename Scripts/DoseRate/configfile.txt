@@ -1,0 +1,7 @@
+ptvFile: /NAS_arpg/asarti/PZ1_studies/ROI_mhd_f32/PTV.mhd 
+optFile: /NAS_arpg/asarti/PZ1_studies/FLASH_studies/PZ1_fixEne_fromAnnalisaBest.txt 
+dijFile: /NAS_arpg/FlashElectrons/Pancreas_PZ1_FRED/Plan_VariableFWHM_fred/mar0.8_ss1_fw1.2_emar0.7_ess0.6_efw0.7/
+eneFlag: 130 130 80 130 110 110 130
+outFlag: PZ1_fmf0.8_fmfthres_4.5
+stpFlag: debug 1 nfields 7 dvoxthresh 1.e-12 nfrac 1.  OARsonly 0
+drStudy: fmfMin 0.9 fmfThres 4.5 drThres 1e4 pulsetime 2.e-6 prf 100. interfield 0.
