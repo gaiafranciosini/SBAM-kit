@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     vector<string> doseFiles;
     vector<float> deliveryTimes;
     string ptvFile, outFile = "output_FLASH.mhd";
-    float DT = 6.0f, FMFmin = 0.6f, Dr_T = 40.0f;
+    float DT = 5.0f, FMFmin = 0.6f, Dr_T = 10.0f;
     int Nfraction = 5; 
 
     // Parsing Argomenti (rimane invariato)

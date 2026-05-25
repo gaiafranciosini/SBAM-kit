@@ -59,7 +59,7 @@ def calcola_intensita_max(region_file, optiplan_file, field_id_richiesto):
         # 7. Calcolo Npulse basato sul PIN massimo
         # Formula: Num_ele_max = intensita_i * 1e9 / io_simu
         num_ele_max = intensita_i_max * 1e9 / io_simu_max
-        num_ele_per_pulse = 2e-6 / 1.6e-19
+        num_ele_per_pulse = 4e-6 / 1.6e-19
         npulse_float = num_ele_max / num_ele_per_pulse
         npulse = math.ceil(npulse_float)
         
