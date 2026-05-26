@@ -1,0 +1,22 @@
+GIRARE SIMULAZIONE FLUKA DI OGNI PIN SINGOLARMENTE PER AVERE DIJ FLUKA
+
+
+1. run_fluka.sh: prende in ingresso la gemetria complete dell'attenuatore già rototraslato e
+simula ogni cella indipendentemte prendendo in ingresso numcella.txt, crea gli inp per ogni inp 
+
+2. Il numcella.txt si crea da Divide_Phase_Space.py, genera i txt di ogni cella
+3. EvaluateFLUKAmap.sh crea la Dij di fluka in Gy per frazione
+
+La simulazione girata per field1 pancreas pz3 sta su robin in /loc_work2/mperri/Pancreas_PZ3/Patch_Att/Simulazione_celle
+
+
+GIRARE OGNI FIELD
+
+1. con MakeAttenuator dato regions_metadata e optiplan e il field ti da il numero di pulse e
+gli spessori di ogni pin per quel field
+2. BuildAttenuator prrnde in ingresso gli spessori e l'inp per ogni field con l'inp in cui è
+già presente posizione di sparo e rototraslazione corretta. bisogna aggiungere il VOXEL e
+spostare la card end trasformation alla fine della gemetria e mettere -VOXEL alla fine del
+CNERO.
+3. La rototraslazione è fatta a mano da matteo --> vedere quaderno gaia con foto di matteo
+
