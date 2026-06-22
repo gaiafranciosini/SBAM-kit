@@ -2,16 +2,18 @@
 # Script per la SOLA visualizzazione delle mappe di dose finali
 
 file_energie="$1"
-CT="$2"
-PTV="$3"
-MARKER="$4"
+sim="$2"
+CT="$3"
+PTV="$4"
+MARKER="$5"
 
-if [ "$#" -lt 4 ]; then
+
+if [ "$#" -lt 5 ]; then
   echo "Uso: $0 <config_file> <CT> <PTV> <MARKER> [ROI1 ROI2 ROI3 ROI4 ...]"
   exit 1
 fi
 
-shift 4
+shift 5
 
 # ======================================================================
 # --- LETTURA ENERGIE TRAMITE GREP ---
@@ -67,8 +69,8 @@ echo "Avvio visualizzatore per le mappe di dose finali..."
 for E in "${energies[@]}"; do
 
     # 1. Troviamo i file corretti usando l'asterisco per scavalcare il numero esatto di impulsi
-    DOSE_CONV_FILE=$(ls sim${E}MeV/DOSE_${E}MeV_*pulses_CONV_FINAL.mhd 2>/dev/null | head -n 1)
-    DOSE_FLASH_FILE=$(ls sim${E}MeV/DOSE_${E}MeV_*pulses_FLASH_FINAL.mhd 2>/dev/null | head -n 1)
+    DOSE_CONV_FILE=$(ls AUTO_sim${E}MeV_${sim}/DOSE_${E}MeV_*pulses_CONV_FINAL.mhd 2>/dev/null | head -n 1)
+    DOSE_FLASH_FILE=$(ls AUTO_sim${E}MeV_${sim}/DOSE_${E}MeV_*pulses_FLASH_FINAL.mhd 2>/dev/null | head -n 1)
 
     # 2. Avviamo il viewer per la dose CONV (colormap 'jet')
     if [[ -f "$DOSE_CONV_FILE" ]]; then
@@ -79,8 +81,8 @@ for E in "${energies[@]}"; do
             --labels "${ALL_ROI_LABELS[@]}" \
             --dose "$DOSE_CONV_FILE" \
             --dose-alpha 0.5 \
-            --dose-cmap "jet" \
-            --title "Dose CONV - ${E} MeV" > "trash_viewer_conv_${E}.out" 2>&1 &
+            --dose-cmap "jet"  > "trash_viewer_conv_${E}.out" 2>&1 &
+#            --title "Dose CONV - ${E} MeV" > "trash_viewer_conv_${E}.out" 2>&1 &
     else
         echo "Attenzione: Mappa CONV non trovata per ${E}MeV."
     fi
@@ -94,8 +96,8 @@ for E in "${energies[@]}"; do
             --labels "${ALL_ROI_LABELS[@]}" \
             --dose "$DOSE_FLASH_FILE" \
             --dose-alpha 0.5 \
-            --dose-cmap "hot" \
-            --title "Dose FLASH - ${E} MeV" > "trash_viewer_flash_${E}.out" 2>&1 &
+            --dose-cmap "hot"  > "trash_viewer_flash_${E}.out" 2>&1 &
+#            --title "Dose FLASH - ${E} MeV" > "trash_viewer_flash_${E}.out" 2>&1 &
     else
         echo "Attenzione: Mappa FLASH non trovata per ${E}MeV."
     fi

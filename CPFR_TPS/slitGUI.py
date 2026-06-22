@@ -750,38 +750,65 @@ class BEVApp:
         self.fig.canvas.draw_idle()
 
     # ── output ────────────────────────────────────────────────────────
+
+    def _next_output_index(self, directory):
+        """
+        Return the next available index N such that ManualFieldSize_N.out
+        does not exist in *directory*.
+
+        - If no ManualFieldSize_*.out file exists yet, returns 1.
+        - Otherwise returns max(existing indices) + 1.
+        """
+        existing = list(Path(directory).glob("ManualFieldSize_*.out"))
+        if not existing:
+            return 1
+
+        indices = []
+        for p in existing:
+            stem = p.stem                    # e.g. "ManualFieldSize_3"
+            parts = stem.rsplit("_", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                indices.append(int(parts[1]))
+
+        return (max(indices) + 1) if indices else 1
+
     def _write_output(self):
-      tb_open, lr_open = self._field_opening()
+        tb_open, lr_open = self._field_opening()
 
-      out_path = Path(self.output_file).with_suffix(".out")
+        # Resolve output directory from self.output_file
+        out_dir = Path(self.output_file).parent
 
-      with open(out_path, 'w') as f:
-          f.write(f"leaf_width_cm: {round(self.rect_w, 4)}\n")
-          f.write(f"leaf_height_cm: {round(self.rect_h, 4)}\n")
-          f.write(f"top_cm: {round(self.top_cm, 4)}\n")
-          f.write(f"bottom_cm: {round(self.bottom_cm, 4)}\n")
-          f.write(f"left_cm: {round(self.left_cm, 4)}\n")
-          f.write(f"right_cm: {round(self.right_cm, 4)}\n")
-          f.write(f"field_opening_top_bottom_cm: {round(tb_open, 4)}\n")
-          f.write(f"field_opening_left_right_cm: {round(lr_open, 4)}\n")
-          f.write(f"rotation_angle_deg: {round(self.angle, 2)}\n")
-          f.write(f"current_slice_z: {int(self.current_z)}\n")
-          f.write(f"isocentre_voxel_x: {self.iso_x}\n")
-          f.write(f"isocentre_voxel_y: {self.iso_y}\n")
-          f.write(f"isocentre_voxel_z: {self.iso_z}\n")
+        # Pick the next sequential index
+        idx = self._next_output_index(out_dir)
+        out_path = out_dir / f"ManualFieldSize_{idx}.out"
 
-      print(f"[saved] {out_path}")
-  
-      # file separato come prima
-      grid_path = out_path.parent / "grid_size.out"
-      with open(grid_path, 'w') as f:
-          f.write(f"{round(self.top_cm, 4)}\n")
-          f.write(f"{round(self.bottom_cm, 4)}\n")
-          f.write(f"{round(self.left_cm, 4)}\n")
-          f.write(f"{round(self.right_cm, 4)}\n")
-          f.write(f"{round(self.angle, 2)}\n")
+        with open(out_path, 'w') as f:
+            f.write(f"leaf_width_cm: {round(self.rect_w, 4)}\n")
+            f.write(f"leaf_height_cm: {round(self.rect_h, 4)}\n")
+            f.write(f"top_cm: {round(self.top_cm, 4)}\n")
+            f.write(f"bottom_cm: {round(self.bottom_cm, 4)}\n")
+            f.write(f"left_cm: {round(self.left_cm, 4)}\n")
+            f.write(f"right_cm: {round(self.right_cm, 4)}\n")
+            f.write(f"field_opening_top_bottom_cm: {round(tb_open, 4)}\n")
+            f.write(f"field_opening_left_right_cm: {round(lr_open, 4)}\n")
+            f.write(f"rotation_angle_deg: {round(self.angle, 2)}\n")
+            f.write(f"current_slice_z: {int(self.current_z)}\n")
+            f.write(f"isocentre_voxel_x: {self.iso_x}\n")
+            f.write(f"isocentre_voxel_y: {self.iso_y}\n")
+            f.write(f"isocentre_voxel_z: {self.iso_z}\n")
 
-      print(f"[saved] {grid_path}")    
+        print(f"[saved] {out_path}")
+
+        # Companion grid_size file (always overwritten, not versioned)
+        grid_path = out_dir / "grid_size.out"
+        with open(grid_path, 'w') as f:
+            f.write(f"{round(self.top_cm, 4)}\n")
+            f.write(f"{round(self.bottom_cm, 4)}\n")
+            f.write(f"{round(self.left_cm, 4)}\n")
+            f.write(f"{round(self.right_cm, 4)}\n")
+            f.write(f"{round(self.angle, 2)}\n")
+
+        print(f"[saved] {grid_path}")
 
 
 # CLI
