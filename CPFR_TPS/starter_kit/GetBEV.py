@@ -81,9 +81,9 @@ parser.add_argument("-W",  help="horizontal field size", type=float, required=Tr
 parser.add_argument("-H",  help="vertical field size", type=float, required=True)
 parser.add_argument("-angle",  help="shape angle", type=float, required=True)
 parser.add_argument("-showsave", help="0 to show or 1 to save image, else for none", type=int, required=True)
-
+parser.add_argument("-output", type=str, default="BEV.jpg")
 args = parser.parse_args()
-
+output_name=args.output
 ptv=args.ptv
 shortslit=np.min(np.array(args.slitsize))
 longslit=np.max(np.array(args.slitsize))
@@ -141,7 +141,7 @@ plt.text(text_coords[0], text_coords[1],
 if showsave==0:
   plt.show()
 elif showsave==1:
-  plt.savefig("BEV.jpg", dpi=200, bbox_inches="tight")
-  print("BEV.jpg saved")
+  plt.savefig(output_name, dpi=200, bbox_inches="tight")
+  print(f"{output_name} saved")
 else:
   print("image is neither shown or saved")

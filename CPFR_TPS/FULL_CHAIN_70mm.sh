@@ -1,6 +1,9 @@
 #!/bin/bash
 #++++++++++++++++++++++++++++++++++
-
+set -e 
+set -o pipefail
+trap 'echo "Errore: comando \"$BASH_COMMAND\" fallito alla riga $LINENO".  Premi ctrl+c per uscire;  exit 1' ERR
+#set -x 
 
 file="$1"
 CT="$2"
@@ -81,13 +84,16 @@ kCONV_9MeV=1.07668788411738e+10
 
 #1. Get BEAM DIRECTION
 
+mkdir -p OUTS
+
+
 nohup python3 starter_kit/GetDirection.py "$CT" -PTV "$PTV" -marker "$MARKER"  > out.out &
 pid=$!
 echo "Computing beam direction"
 
   fail=0
   if ! wait "$pid"; then
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid terminated with an error"
   fi
 
@@ -108,9 +114,20 @@ read -r Vx Vy Vz < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print ""; # <--- DEVI AGGIUNGERE RIGOROSAMENTE QUESTA RIGA!
 }')
 
 echo "Beam direction: Vx:${Vx} Vy:${Vy} Vz:${Vz}"
+echo "Vx:${Vx}" > OUTS/beam_direction.out 
+echo "Vy:${Vy}" >> OUTS/beam_direction.out 
+echo "$top_cm"                # 2.0000
+echo "$bottom_cm"             # 2.0000
+echo "$left_cm"               # 3.0000
+echo "$right_cm"              # 3.0000
+echo "$opening_top_bottom_cm" # 4.0000
+echo "$opening_left_right_cm" # 6.0000
+echo "$angle_deg"             # 0.00echo "Vz:${Vz}" >> OUTS/beam_direction.out 
+
 
 echo "Rotating PTV, ROIs and CT"
 python3 starter_kit/RotROIsQuat.py "$PTV" "$Vx" "$Vy" "$Vz" imgs/PTV_ROT.mhd > ptv.out
@@ -119,7 +136,7 @@ for roi in "${ROIs[@]}"; do
   python3 starter_kit/RotROIsQuat.py "imgs/${roi}.mhd" "$Vx" "$Vy" "$Vz" imgs/${roi}_ROT.mhd > trash.out
   echo "${roi} rotated and saved as imgs/${roi}_ROT.mhd"
 done
-python3 starter_kit/RotMapsQuat.py "$CT" "$Vx" "$Vy" "$Vz" imgs/CT_ROT.mhd > trash.out
+python3 starter_kit/RotMapsQuat.py "$CT" "$Vx" "$Vy" "$Vz" imgs/CT_ROT.mhd >	imgs/CT_ROT_matrix.txt
 echo "CT rotated and saved as imgs/CT_ROT.mhd"
 
 echo "Shifting ROIs and CT to center the PTV in [0,0,z]"
@@ -134,8 +151,13 @@ read -r idxPTVx idxPTVy idxPTVz < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print ""; # <-- AGGIUNTA FONDAMENTALE
 }')
 echo "X_ptv[idx]: $idxPTVx | Y_ptv[idx]: $idxPTVy | Z_ptv[idx]: $idxPTVz"
+
+echo "X_ptv[idx]: $idxPTVx" > OUTS/PTV_ROT.out
+echo "Y_ptv[idx]: $idxPTVy" >> OUTS/PTV_ROT.out
+echo "Z_ptv[idx]: $idxPTVz" >> OUTS/PTV_ROT.out
 
 output=$(grep -F "ISO_PTV[cm]:" ptv.out | head -n 1)
 read -r PTVx PTVy PTVz < <(echo "$output" | awk '{
@@ -147,8 +169,13 @@ read -r PTVx PTVy PTVz < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print ""; # <--- DEVI AGGIUNGERE QUESTA RIGA QUI!!!
 }')
 echo "X_ptv: $PTVx | Y_ptv: $PTVy | Z_ptv: $PTVz"
+
+echo "X_ptv: $PTVx" >> OUTS/PTV_ROT.out
+echo "Y_ptv: $PTVy" >> OUTS/PTV_ROT.out
+echo "Z_ptv: $PTVz" >> OUTS/PTV_ROT.out
 
 SHx=$(echo "$PTVx * -1" | bc -l)
 SHy=$(echo "$PTVy * -1" | bc -l)
@@ -181,7 +208,7 @@ echo "Optimising geometry"
 
   fail=0
   if ! wait "$pid"; then
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid terminated with an error"
   fi
 
@@ -194,9 +221,11 @@ echo "Optimising geometry"
 echo "Geometry optimization details reported in rectangles.out"
 echo " "
 echo "Cropping PTV, CT and ROIs"
-python3 starter_kit/mhd_info.py imgs/CT_SH.mhd > info.out
-output=$(grep "dims=" info.out | head -n 1)
+cp rectangles.out OUTS/
 
+python3 starter_kit/mhd_info.py imgs/CT_SH.mhd > info.out
+cp info.out OUTS/
+output=$(grep "dims=" info.out | head -n 1)
 read -r dimX dimY dimZ < <(echo "$output" | awk '{
   count = 0;
   for (i=1; i<=NF; i++) {
@@ -206,14 +235,16 @@ read -r dimX dimY dimZ < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+    print "";
 }')
 
-cropZ=$(( idxPTVz - 1 )) #to make sure that the first slice of the PTV is not cut out
+cropZ=$(( idxPTVz - 1 ))  #to make sure that the first slice of the PTV is not cut out
 if ((cropZ<0)); then
     cropZ=0
 fi
-
+echo "$cropZ" > imgs/cropZ.txt
 python3 starter_kit/mhd_crop.py \-i imgs/CT_SH.mhd \-o imgs/CT_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > crop.out
+cp crop.out OUTS/
 python3 starter_kit/mhd_crop.py \-i imgs/PTV_SH.mhd \-o imgs/PTV_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > trash.out
 for roi in "${ROIs[@]}"; do
   python3 starter_kit/mhd_crop.py \-i imgs/${roi}_SH.mhd \-o imgs/${roi}_CROP.mhd \-ixi 0  \-ixf "$dimX" \-iyi 0 \-iyf "$dimY" \-izi "$cropZ" \-izf "$dimZ" > trash.out
@@ -231,6 +262,7 @@ read -r X0crop Y0crop Z0crop < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print "";
 }')
 echo "Images cropped at [cm]: $X0crop $Y0crop $Z0crop"
 #***for USRBIN***
@@ -245,6 +277,7 @@ read -r Xfcrop Yfcrop Zfcrop < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print "";
 }')
 
 output=$(grep "new_dims:" crop.out | head -n 1)
@@ -257,6 +290,7 @@ read -r dimXcrop dimYcrop dimZcrop < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print "";
 }')
 
 
@@ -270,6 +304,8 @@ read -r newLx newLy newLz < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print "";
+
 }')
 #*** ***
 
@@ -278,7 +314,7 @@ Ygrid=8 #cm     -Ygrid/2 |------0------| +Ygrid/2
 Zgrid=6 #cm            0 |-------------| +Zgrid
 
 python3 starter_kit/GetGridSize.py -ct imgs/CT_CROP.mhd -size ${Xgrid} ${Ygrid} ${Zgrid} > grid_size.out
-
+cp grid_size.out OUTS/
 output=$(grep "grid_coord: " grid_size.out | head -n 1)
 read -r gridXin gridXf gridYin gridYf gridZin gridZf < <(echo "$output" | awk '{
   count = 0;
@@ -289,6 +325,7 @@ read -r gridXin gridXf gridYin gridYf gridZin gridZf < <(echo "$output" | awk '{
       if (count == 6) break;
     }
   }
+  print "";
 }')
 
 
@@ -302,6 +339,7 @@ read -r gridXidx gridYidx gridZidx < <(echo "$output" | awk '{
       if (count == 3) break;
     }
   }
+  print "";
 }')
 
 echo "Cropped images dimensions: $dimXcrop $dimYcrop $dimZcrop"
@@ -379,6 +417,7 @@ read -r deg < <(grep "BEST_ANGLE:" rectangles.out | awk '{
       print $i; exit;
     }
   }
+  print "";
 }')
 
 
@@ -388,6 +427,7 @@ read -r W < <(grep "Width_${deg}:" rectangles.out | awk '{
       print $i; exit;
     }
   }
+  print "";
 }')
 Ws+=("$W")
 
@@ -397,12 +437,13 @@ read -r H < <(grep "Height_${deg}:" rectangles.out | awk '{
       print $i; exit;
     }
   }
+  print "";
 }')
 
 
 for E in "${energies[@]}"; do
 mkdir -p "sim${E}MeV"
-rm -f sim${E}MeV/*
+rm -rf sim${E}MeV/*
 python3 starter_kit/GetBestSize.py -ptv imgs/PTV_plan.mhd -lutpath starter_kit/LUTs -min_size ${W} ${H} -E ${E} > "sim${E}MeV/field_size.out"
 #usage: GetBestSize.py [-h] -ptv path -lutpath path -min_size MIN_SIZE MIN_SIZE -E E
 
@@ -412,6 +453,7 @@ read -r bestXsize < <(grep "Xsize:" sim${E}MeV/field_size.out | awk '{
       print $i; exit;
     }
   }
+  print "";
 }')
 
 read -r bestYsize < <(grep "Ysize:" sim${E}MeV/field_size.out | awk '{
@@ -420,6 +462,7 @@ read -r bestYsize < <(grep "Ysize:" sim${E}MeV/field_size.out | awk '{
       print $i; exit;
     }
   }
+  print "";
 }')
 
 # 4. MODIFY FLUKA file - field size
@@ -490,7 +533,7 @@ read -r bestYsize < <(grep "Ysize:" sim${E}MeV/field_size.out | awk '{
   }' "sim${E}MeV/aperture.out"
 )
 
-python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${bestXsize}" -H "${bestYsize}" -angle "${deg}" -showsave 1
+python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${bestXsize}" -H "${bestYsize}" -angle "${deg}" -showsave 1 -output "BEV${E}MeV.jpg"
 
 echo "---------------------------------------------------------------"
 echo "                      FIELD SIZE ${E}MeV                       "
@@ -535,14 +578,15 @@ done
 echo "Waiting all the simulations to be completed"
 fail=0
 i=0
+set +e
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
-    ((fail++))
+    ((++fail))
     echo "Process PID ${pid} (${what_pid[i]}) terminated with an error"
   fi
-  (( i++ ))
+  (( ++i ))
 done
-
+set -e
 if ((fail==0)); then
   echo "All simulations terminated succesfully"
 else
@@ -572,13 +616,15 @@ done
 echo "Waiting all .bnn files to be converted to .mhd maps"
 fail=0
 i=0
+set +e
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid (${what_pid[i]}) terminated with an error"
   fi
-  (( i++ ))
+  (( ++i ))
 done
+set -e
 
 if ((fail==0)); then
   echo "All conversions terminated successfully"
@@ -588,16 +634,17 @@ fi
 
 
 pids=()
+pids=()
 for E in "${energies[@]}"; do
   cd sim${E}MeV
   check=(dose_tot_run*)
   if (( ${#check[@]} == 1 )); then
-    cp "${check[0]}" dose_tot_run_copy.mhd
+    cp "${check[0]}" copy_dose_tot_run.mhd
   fi
-  nohup ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
+  nohup python3 ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
-done 
+done
 
 echo "Waiting maps to be combined"
 fail=0
@@ -635,6 +682,7 @@ for E in "${energies[@]}"; do
         if (count == 2) break;
       }
     }
+    print ""
   }')
 
 #  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider ${max}
@@ -671,6 +719,32 @@ for E in "${energies[@]}"; do
 #  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
   pids+=("$!")
   cd ..
+   echo "Ripristino le dimensioni originali della Mappa di Dose per ${E}MeV..."
+
+  # 1. De-crop (padding)
+  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd -cz "$cropZ"
+  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd -cz "$cropZ"
+
+  # 2. De-shift
+  invSHx=$PTVx
+  echo "$invSHx" > imgs/invSHx.txt
+  invSHy=$PTVy
+  echo "$invSHy" > imgs/invSHy.txt
+  invSHz=$Z0crop
+  echo "$invSHz" > imgs/invSHz.txt
+
+  python3 starter_kit/mhd_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd" "${invSHx}" "${invSHy}" "${invSHz}" sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd
+  python3 starter_kit/mhd_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd" "${invSHx}" "${invSHy}" "${invSHz}" sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd
+  awk '/ROTATION MATRIX/{flag=1; next} /Rotated image/{flag=0} flag' imgs/CT_ROT_matrix.txt | tr -d '[]' > imgs/rotation_matrix.txt
+
+  # 3. Contro-rotazione
+  python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
+
+echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
+
+python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
+
+echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
 
 echo "---------------------------------------------------------------"
 echo "                   PULSES ${E}MeV FLASH: ${pulses_FLASH}       "
@@ -684,7 +758,7 @@ echo "Waiting png images to be created and saved"
 fail=0
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid terminated with an error"
   fi
 done
@@ -692,14 +766,31 @@ done
 if ((fail==0)); then
   echo "All dose maps and DVHs created!"
 else
-  echo "$fail process(es) terminated with an error"
+  echo "$fail process terminated with an error"
 fi
 echo "DVHdirs content:"
 printf "%s\n" "${DVHdirs[@]}"
 
-python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL.png"
+python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL.png" 	--label-mode file 
 
-echo "Enjoy!"
+mkdir -p files
+for E in ${energies[@]}; do
+
+cp sim${E}MeV/EF70mm${E}MeV.inp files/
+
+
+i=1
+while [ -d "AUTO_sim${E}MeV_$i" ]; do
+  ((i++))
+done
+mv "sim${E}MeV" "AUTO_sim${E}MeV_$i"
+rm -f "AUTO_sim${E}MeV_$i/*PADDED_deSH.mhd"
+rm -f  "AUTO_sim${E}MeV_$i/*PADDED.mhd"
+rm -f "AUTO_sim${E}MeV_$i/*PADDED_deSH.raw"
+rm -f "AUTO_sim${E}MeV_$i/*PADDED.raw"
+done
+
+echo "Enjoy! Premi ctrl+c per uscire"
 
 
 
