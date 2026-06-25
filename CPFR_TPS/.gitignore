@@ -1,0 +1,5 @@
+# Ignora tutti i file compilati/eseguibili
+*.x
+
+# Ignora i file di backup temporanei (quelli con la tilde)
+*~
