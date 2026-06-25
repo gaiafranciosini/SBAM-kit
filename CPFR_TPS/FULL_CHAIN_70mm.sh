@@ -2,7 +2,7 @@
 #++++++++++++++++++++++++++++++++++
 set -e 
 set -o pipefail
-trap 'echo "Errore: comando \"$BASH_COMMAND\" fallito alla riga $LINENO".  Premi ctrl+z per uscire;  exit 1' ERR
+trap 'echo "Errore: comando \"$BASH_COMMAND\" fallito alla riga $LINENO".  Premi ctrl+c per uscire;  exit 1' ERR
 #set -x 
 
 file="$1"
@@ -93,7 +93,7 @@ echo "Computing beam direction"
 
   fail=0
   if ! wait "$pid"; then
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid terminated with an error"
   fi
 
@@ -208,7 +208,7 @@ echo "Optimising geometry"
 
   fail=0
   if ! wait "$pid"; then
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid terminated with an error"
   fi
 
@@ -533,7 +533,7 @@ read -r bestYsize < <(grep "Ysize:" sim${E}MeV/field_size.out | awk '{
   }' "sim${E}MeV/aperture.out"
 )
 
-python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${bestXsize}" -H "${bestYsize}" -angle "${deg}" -showsave 1
+python3 starter_kit/GetBEV.py -ptv imgs/PTV_SH.mhd -slitsize "${width}" "${height}" -W "${bestXsize}" -H "${bestYsize}" -angle "${deg}" -showsave 1 -output "BEV${E}MeV.jpg"
 
 echo "---------------------------------------------------------------"
 echo "                      FIELD SIZE ${E}MeV                       "
@@ -581,7 +581,7 @@ i=0
 set +e
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
-    ((fail++))
+    ((++fail))
     echo "Process PID ${pid} (${what_pid[i]}) terminated with an error"
   fi
   (( ++i ))
@@ -619,7 +619,7 @@ i=0
 set +e
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid (${what_pid[i]}) terminated with an error"
   fi
   (( ++i ))
@@ -634,16 +634,17 @@ fi
 
 
 pids=()
+pids=()
 for E in "${energies[@]}"; do
   cd sim${E}MeV
   check=(dose_tot_run*)
   if (( ${#check[@]} == 1 )); then
-    cp "${check[0]}" dose_tot_run_copy.mhd
+    cp "${check[0]}" copy_dose_tot_run.mhd
   fi
   nohup python3 ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
-done 
+done
 
 echo "Waiting maps to be combined"
 fail=0
@@ -757,7 +758,7 @@ echo "Waiting png images to be created and saved"
 fail=0
 for pid in "${pids[@]}"; do
   if ! wait "$pid"; then 
-    ((fail++))
+    ((++fail))
     echo "Process PID $pid terminated with an error"
   fi
 done
@@ -783,9 +784,13 @@ while [ -d "AUTO_sim${E}MeV_$i" ]; do
   ((i++))
 done
 mv "sim${E}MeV" "AUTO_sim${E}MeV_$i"
+rm -f "AUTO_sim${E}MeV_$i/*PADDED_deSH.mhd"
+rm -f  "AUTO_sim${E}MeV_$i/*PADDED.mhd"
+rm -f "AUTO_sim${E}MeV_$i/*PADDED_deSH.raw"
+rm -f "AUTO_sim${E}MeV_$i/*PADDED.raw"
 done
 
-echo "Enjoy!"
+echo "Enjoy! Premi ctrl+c per uscire"
 
 
 

@@ -189,6 +189,7 @@ def main():
     parser.add_argument('--dose-window', type=float, nargs=2, metavar=('DMIN', 'DMAX'), default=None, help='Finestra dose per visualizzazione (stessa unità della dose, es. Gy)')
     parser.add_argument('--dose-cmap', type=str, default='inferno', help='Colormap Matplotlib per la dose (default: inferno)')
     parser.add_argument('--dose-alpha', type=float, default=0.5, help='Trasparenza iniziale dose [0-1] (default: 0.5)')
+    parser.add_argument('--title', type=str, default='Viewer', help='Titolo della finestra')
 
     args = parser.parse_args()
 
@@ -252,6 +253,7 @@ def main():
 
     # --- Figure ---
     fig, axes = plt.subplots(1, 3, figsize=(14, 5), gridspec_kw={'width_ratios': [1, 1, 1.05]})
+    #fig.canvas.manager.set_window_title(args.title)
     ax_axial, ax_cor, ax_sag = axes
     ax_axial.set_title('Trasversale (assiale) — Z')
     ax_cor.set_title('Coronale — Y')
@@ -286,7 +288,7 @@ def main():
         im_dose_sa = ax_sag.imshow(d_sa, cmap=args.dose_cmap, norm=dose_norm,
                                    alpha=args.dose_alpha, origin='lower', extent=ext_sa)
         # Colorbar laterale destra
-        cbar_ax = fig.add_axes([0.92, 0.2, 0.015, 0.6])
+        cbar_ax = fig.add_axes([0.92, 0.36, 0.015, 0.49])
         cbar = fig.colorbar(im_dose_ax, cax=cbar_ax)
         cbar.set_label('Dose (unità native)')
         ticks = nice_ticks(dose_norm.vmin, dose_norm.vmax, max_ticks=12)
@@ -325,10 +327,10 @@ def main():
     plt.subplots_adjust(left=0.07, right=0.9, bottom=0.36, top=0.92, wspace=0.15)
 
     axcolor = 'lightgoldenrodyellow'
-    ax_i = plt.axes([0.07, 0.27, 0.86, 0.03], facecolor=axcolor)
-    ax_j = plt.axes([0.07, 0.23, 0.86, 0.03], facecolor=axcolor)
-    ax_k = plt.axes([0.07, 0.19, 0.86, 0.03], facecolor=axcolor)
-    ax_da = plt.axes([0.07, 0.15, 0.86, 0.03], facecolor=axcolor)
+    ax_i = plt.axes([0.07, 0.27, 0.83, 0.03], facecolor=axcolor)
+    ax_j = plt.axes([0.07, 0.23, 0.83, 0.03], facecolor=axcolor)
+    ax_k = plt.axes([0.07, 0.19, 0.83, 0.03], facecolor=axcolor)
+    ax_da = plt.axes([0.07, 0.15, 0.83, 0.03], facecolor=axcolor)
 
     s_i = Slider(ax_i, 'X (i)', 0, nx - 1, valinit=i, valfmt='%0.0f')
     s_j = Slider(ax_j, 'Y (j)', 0, ny - 1, valinit=j, valfmt='%0.0f')
@@ -480,14 +482,46 @@ def main():
         elif event.key == 'pagedown':
             s_k.set_val(np.clip(s_k.val - step, s_k.valmin, s_k.valmax))
 
-    fig.canvas.mpl_connect('key_press_event', on_key)
-
+ #   fig.canvas.mpl_connect('key_press_event', on_key)
+    
+    # --- GESTIONE TITOLI ---
+#titolo_finestra = args.title 
+    #titolo_finestra = titolo_finestra.replace('_', ' ')
+    
+    # 1. Titolo interno alla figura (corretto per non essere tagliato fuori)
+    #fig.suptitle(titolo_finestra, fontsize=14, fontweight='bold', y=0.95)
+    
+    # 2. SE TI SERVE CAMBIARE IL TITOLO DELLA FINESTRA DI SISTEMA (es. al posto di "Figure 1")
+    #if fig.canvas.manager is not None:
+     #   fig.canvas.manager.set_window_title(titolo_finestra)
+    
+    # Riduciamo il top dei grafici a 0.85 per evitare sovrapposizioni
+    #plt.subplots_adjust(left=0.07, right=0.9, bottom=0.36, top=0.85, wspace=0.15)
+    #fig.suptitle(args.title, fontsize=14, fontweight='bold', y=0.98)
+    # Leggenda ROI
+    legend_handles = [plt.Line2D([0], [0], color=colors[i], lw=2.5, label=labels[i]) for i in range(len(roi_arrays))]
+    ncol = min(len(legend_handles), 6)
+    fig.legend(handles=legend_handles, loc='lower center', ncol=ncol, bbox_to_anchor=(0.5, 0.06))
     # Leggenda ROI
     legend_handles = [plt.Line2D([0], [0], color=colors[i], lw=2.5, label=labels[i]) for i in range(len(roi_arrays))]
     ncol = min(len(legend_handles), 6)
     fig.legend(handles=legend_handles, loc='lower center', ncol=ncol, bbox_to_anchor=(0.5, 0.06))
 
+    # ======================================================================
+    # --- FIX DEFINITIVO PER I TITOLI (Spostato alla fine del main) ---
+    titolo_pulito = args.title.replace('_', ' ')
+    
+    # 1. Forza il titolo interno alla figura (abbassando top a 0.850 per non sovrapporsi)
+    fig.suptitle(titolo_pulito, fontsize=14, fontweight='bold', y=0.96)
+    plt.subplots_adjust(left=0.07, right=0.9, bottom=0.36, top=0.85, wspace=0.15)
+    
+    # 2. Forza il titolo sulla barra di sistema quando il canvas è pronto
+    if fig.canvas.manager is not None:
+        fig.canvas.manager.set_window_title(titolo_pulito)
+    # ======================================================================
+
     plt.show()
+
 
 
 if __name__ == '__main__':

@@ -31,7 +31,7 @@ LEFT=$(sed -n '5p' "$INPUT_MANUAL" | awk '{print $2}')
 RIGHT=$(sed -n '6p' "$INPUT_MANUAL" | awk '{print $2}')
 
 # Costruiamo il suffisso per le cartelle (es: _L 3.0_R 3.0_T 2.0_B 2.0_cm)
-SUFFIX_DIR="_L ${LEFT}_R ${RIGHT}_T ${TOP}_B ${BOTTOM}_cm"
+SUFFIX_DIR="_L${LEFT}_R${RIGHT}_T${TOP}_B${BOTTOM}_cm_${sim}"
 # ======================================================================
 
 # --- LETTURA ENERGIE TRAMITE GREP (da setup.out) ---
@@ -96,14 +96,15 @@ for E in "${energies[@]}"; do
     # 2. Avviamo il viewer per la dose CONV
     if [[ -f "$DOSE_CONV_FILE" ]]; then
         echo "Apertura CONV: $DOSE_CONV_FILE"
+        TITOLO_CONV="Dose_CONV_${E}_MeV"
         nohup python3 starter_kit/viewer_zoom_manual.py \
             --ct "$CT" \
             --roi "${ALL_ROI_PATHS[@]}" \
             --labels "${ALL_ROI_LABELS[@]}" \
             --dose "$DOSE_CONV_FILE" \
             --dose-alpha 0.5 \
-            --dose-cmap "jet"  > "trash_viewer_conv_${E}.out" 2>&1 &
-#          --title "Dose CONV - ${E} MeV ($DIR_ENERGIA)" > "trash_viewer_conv_${E}.out" 2>&1 &
+            --dose-cmap "jet"  \
+            --title "$TITOLO_CONV" > "trash_viewer_conv_${E}.out" 2>&1 &
     else
         echo "Mappa CONV non trovata in $DIR_ENERGIA"
     fi
@@ -111,14 +112,15 @@ for E in "${energies[@]}"; do
     # 3. Avviamo il viewer per la dose FLASH
     if [[ -f "$DOSE_FLASH_FILE" ]]; then
         echo "Apertura FLASH: $DOSE_FLASH_FILE"
+        TITOLO_FLASH="Dose_FLASH_${E}_MeV"
         nohup python3 starter_kit/viewer_zoom_manual.py \
             --ct "$CT" \
             --roi "${ALL_ROI_PATHS[@]}" \
             --labels "${ALL_ROI_LABELS[@]}" \
             --dose "$DOSE_FLASH_FILE" \
             --dose-alpha 0.5 \
-            --dose-cmap "hot" > "trash_viewer_flash_${E}.out" 2>&1 &
-#            --title "Dose FLASH - ${E} MeV ($DIR_ENERGIA)" > "trash_viewer_flash_${E}.out" 2>&1 &
+            --dose-cmap "hot" \
+            --title "$TITOLO_FLASH" > "trash_viewer_flash_${E}.out" 2>&1 &
     else
         echo "Mappa FLASH non trovata in $DIR_ENERGIA"
     fi

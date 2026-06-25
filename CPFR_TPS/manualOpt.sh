@@ -2,22 +2,22 @@
 #++++++++++++++++++++++++++++++++++
 set -e
 set -o pipefail
-trap 'echo "Errore: comando \"$BASH_COMMAND\" fallito alla riga $LINENO".  Premi ctrl+z per uscire;  exit 1' ERR
-set -x
-
+trap 'echo "Errore: comando \"$BASH_COMMAND\" fallito alla riga $LINENO".  Premi ctrl+c per uscire;  exit 1' ERR
+#set -x
 
 file="$1"
 CT="$2"
 PTV="$3"
 MARKER="$4"
+FIELD_ID="$5"
 
-if [ "$#" -lt 4 ]; then
-  echo "Use: CT PTV MARKER [ROI1 ROI2 ROI3 ROI4 ...]"
+if [ "$#" -lt 5 ]; then
+  echo "Use: FILE CT PTV MARKER FIELD_ID [ROI1 ROI2 ROI3 ROI4 ...]"
   exit 1
 fi
 
-echo "$1 $2 $3 $4" > input_log.out
-shift 4
+echo "$1 $2 $3 $4 $5" > input_log.out
+shift 5
 # Array che conterr   i nomi puliti
 ROIs=()
 
@@ -95,21 +95,29 @@ for E in "${energies[@]}"; do
   bash starter_kit/card_modifier.sh sim${E}MeV/EF70mm${E}MeV.inp sim${E}MeV/tmp.inp "START" 1 "${primaries_per_CPU}" 1
   mv sim${E}MeV/tmp.inp sim${E}MeV/EF70mm${E}MeV.inp
 
-
-
 done
+
+# Controllo esistenza file ManualFieldSize
+manual_file="ManualFieldSize_${FIELD_ID}.out"
+if [ ! -f "$manual_file" ]; then
+    echo "Errore: il file $manual_file non esiste!"
+    exit 1
+fi
 
 while IFS=':' read -r key value; do
     [[ -z "$key" || -z "$value" ]] && continue
+    # Pulizia base per evitare problemi di formattazione nascosti (spazi o carriage return)
+    key=$(echo "$key" | tr -d '\r' | xargs)
+    value=$(echo "$value" | tr -d '\r' | xargs)
     declare "${key}=${value}"
-done < ManualFieldSize.out
+done < "$manual_file"
 
-# top_cm 
-# bottom_cm 
-# left_cm 
-# right_cm 
-# opening_top_bottom_cm 
-# opening_left_right_cm 
+# top_cm
+# bottom_cm
+# left_cm
+# right_cm
+# opening_top_bottom_cm
+# opening_left_right_cm
 # angle_deg
 
 # ATTENTION: BEV x-axis is reversed in FLUKA, left and right must be inverted
@@ -139,19 +147,19 @@ for E in "${energies[@]}"; do
 
   python3 starter_kit/ManualGetSlitMargins.py ${width} ${height} ${FLUKA_right_cm} ${FLUKA_left_cm} ${top_cm} ${bottom_cm}  > "sim${E}MeV/aperture.out"
   read -r Xi_right Xf_right Xi_left Xf_left Yi_down Yf_down Yi_up Yf_up < <(
-  awk '/^APERTURE:/{ 
-    for(i=2;i<=NF;i++) 
-      if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/) 
-        printf "%s ", $i; 
+  awk '/^APERTURE:/{
+    for(i=2;i<=NF;i++)
+      if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/)
+        printf "%s ", $i;
     print ""
   }' "sim${E}MeV/aperture.out"
 )
 
 #  echo "$Xi_right $Xf_right $Xi_left $Xf_left $Yi_down $Yf_down $Yi_up $Yf_up"
-#  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV/EF70mm${E}MeV.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV/EF70mm${E}MeV.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV/EF70mm${E}MeV.inp 
-#  sed -i -E "s/^((RPP[[:space:]]+lam4[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_right} ${Xf_right} /" sim${E}MeV/EF70mm${E}MeV.inp 
+#  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV/EF70mm${E}MeV.inp
+#  sed -i -E "s/^((RPP[[:space:]]+lam2[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_down} ${Yf_down} /" sim${E}MeV/EF70mm${E}MeV.inp
+#  sed -i -E "s/^((RPP[[:space:]]+lam3[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_left} ${Xf_left} /" sim${E}MeV/EF70mm${E}MeV.inp
+#  sed -i -E "s/^((RPP[[:space:]]+lam4[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Xi_right} ${Xf_right} /" sim${E}MeV/EF70mm${E}MeV.inp
 
   # lam1: aggiorna Ymin (k=3) e Ymax (k=4)
   bash starter_kit/object_card_modifier.sh \
@@ -227,7 +235,7 @@ echo "Waiting all the simulations to be completed"
 fail=0
 i=0
 for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then 
+  if ! wait "$pid"; then
     ((fail++))
     echo "Process PID ${pid} (${what_pid[i]}) terminated with an error"
   fi
@@ -245,7 +253,7 @@ ROIs_plan=()
 for roi in "${ROIs[@]}"; do
 all_rois_path+=("../imgs/${roi}_plan.mhd")
 ROIs_plan+=("${roi}_plan")
-done 
+done
 
 
 
@@ -254,17 +262,17 @@ for E in "${energies[@]}"; do
   cd sim${E}MeV
   for run in $(seq 1 "${INPs}")
   do
-    nohup ../starter_kit/bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 & 
+    nohup ../starter_kit/bnn2mhd run_${run}R001_fort.23 dose_tot_run_${run}.mhd -Gy > trash.out 2>&1 &
     pids+=("$!")
   done
   cd ..
-done 
+done
 
 echo "Waiting all .bnn files to be converted to .mhd maps"
 fail=0
 i=0
 for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then 
+  if ! wait "$pid"; then
     ((fail++))
     echo "Process PID $pid (${what_pid[i]}) terminated with an error"
   fi
@@ -288,12 +296,12 @@ for E in "${energies[@]}"; do
   nohup python3 ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
-done 
+done
 
 echo "Waiting maps to be combined"
 fail=0
 for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then 
+  if ! wait "$pid"; then
     ((fail++))
     echo "Process PID $pid terminated with an error"
   fi
@@ -349,7 +357,7 @@ for E in "${energies[@]}"; do
   pulses_FLASH=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt ${preD} ${preV} )
   pulses_CONV=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt ${preD} ${preV} )
   python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${pulses_FLASH}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${pulses_CONV}"  
+  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${pulses_CONV}"
   ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_FLASH.mhd -type float -fileLabel ${E}MeV_FLASH -dir DVH${E}MeV_FLASH --binningDVH 1000  > trash.out
   ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_CONV.mhd -type float -fileLabel ${E}MeV_CONV -dir DVH${E}MeV_CONV --binningDVH 1000  > trash.out
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV_FLASH -dir1 DVH${E}MeV_FLASH -roi PTV_plan "${ROIs_plan[@]}" > trash.out
@@ -399,12 +407,12 @@ echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}p
   echo "---------------------------------------------------------------"
 
 
-done 
+done
 
 echo "Waiting png images to be created and saved"
 fail=0
 for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then 
+  if ! wait "$pid"; then
     ((fail++))
     echo "Process PID $pid terminated with an error"
   fi
@@ -418,14 +426,19 @@ fi
 echo "DVHdirs content:"
 printf "%s\n" "${DVHdirs[@]}"
 
-python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL.png"
+python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL_${FIELD_ID}.png"
 
 for E in ${energies[@]}; do
-mv "sim${E}MeV" "MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm"
-echo "L R T B = left right top bottom slit aperture in cm"
+# Cartella di output univoca per evitare sovrascritture in run successivi
+mv "sim${E}MeV" "MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}"
+echo "L R T B = left right top bottom slit aperture in cm (ID: ${FIELD_ID})"
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.raw
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.raw
 done
 
-echo "Enjoy!"
+echo "Enjoy! Premere ctrl+c per uscire"
 
 
 

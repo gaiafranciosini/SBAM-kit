@@ -154,7 +154,6 @@ def draw_contours(ax, contours_xy, color, lw=1.8):
     return lines
 
 
-# === Tacche "belle" per colorbar ===
 def nice_ticks(vmin: float, vmax: float, max_ticks: int = 12):
     if not np.isfinite([vmin, vmax]).all():
         return []
@@ -171,7 +170,6 @@ def nice_ticks(vmin: float, vmax: float, max_ticks: int = 12):
     stop = math.ceil(vmax / step) * step
     ticks = np.arange(start, stop + 0.5 * step, step)
     ticks = ticks[(ticks >= vmin - 1e-9) & (ticks <= vmax + 1e-9)]
-    # preferisci multipli da 50 se l'intervallo è ampio
     if span >= 500:
         step50 = max(50, int(round(step / 50.0)) * 50)
         start50 = math.ceil(vmin / step50) * step50
@@ -191,6 +189,9 @@ def main():
     parser.add_argument('--dose-alpha', type=float, default=0.5, help='Trasparenza iniziale dose [0-1] (default: 0.5)')
     parser.add_argument('--title', type=str, default='Viewer', help='Titolo della finestra')
     args = parser.parse_args()
+
+    # --- FIX TITOLI: Elaborazione immediata del titolo ---
+    titolo_pulito = args.title.replace('_', ' ')
 
     if args.labels is not None and len(args.labels) != len(args.roi):
         raise SystemExit(f"Il numero di etichette ({len(args.labels)}) deve coincidere con il numero di ROI ({len(args.roi)}).")
@@ -243,16 +244,17 @@ def main():
             if arrf.size == 0:
                 dmin, dmax = 0.0, 1.0
             else:
-                # Fondo a 0 se la dose è non-negativa; altrimenti usa il minimo reale
                 dmin = 0.0 if arrf.min() >= 0 else float(arrf.min())
                 dmax = float(arrf.max())
                 if dmax <= dmin:
                     dmax = dmin + 1.0
         dose_norm = Normalize(vmin=dmin, vmax=dmax)
 
-    # --- Figure ---
-    fig, axes = plt.subplots(1, 3, figsize=(14, 5), gridspec_kw={'width_ratios': [1, 1, 1.05]})
-    fig.canvas.manager.set_window_title(args.title)
+    # --- Figure (Inserito num=titolo_pulito per forzare la barra di sistema) ---
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5), 
+                             gridspec_kw={'width_ratios': [1, 1, 1.05]}, 
+                             num=titolo_pulito)
+    
     ax_axial, ax_cor, ax_sag = axes
     ax_axial.set_title('Trasversale (assiale) — Z')
     ax_cor.set_title('Coronale — Y')
@@ -275,7 +277,7 @@ def main():
     im_ct_co = ax_cor.imshow(ct_co, cmap='gray', vmin=vmin, vmax=vmax, origin='lower', extent=ext_co)
     im_ct_sa = ax_sag.imshow(ct_sa, cmap='gray', vmin=vmin, vmax=vmax, origin='lower', extent=ext_sa)
 
-    # Dose overlays (se presente) + colorbar con tacche “belle”
+    # Dose overlays
     im_dose_ax = im_dose_co = im_dose_sa = None
     cbar = None
     if dose_vol is not None:
@@ -286,15 +288,15 @@ def main():
                                    alpha=args.dose_alpha, origin='lower', extent=ext_co)
         im_dose_sa = ax_sag.imshow(d_sa, cmap=args.dose_cmap, norm=dose_norm,
                                    alpha=args.dose_alpha, origin='lower', extent=ext_sa)
-        # Colorbar laterale destra
-        cbar_ax = fig.add_axes([0.92, 0.2, 0.015, 0.6])
+        
+        cbar_ax = fig.add_axes([0.92, 0.36, 0.015, 0.49])
         cbar = fig.colorbar(im_dose_ax, cax=cbar_ax)
         cbar.set_label('Dose (unità native)')
         ticks = nice_ticks(dose_norm.vmin, dose_norm.vmax, max_ticks=12)
         if ticks:
             cbar.set_ticks(ticks)
 
-    # ROI contours (liste di Line2D per poterle rimuovere/aggiornare)
+    # ROI contours
     roi_ax_lines: List[List[plt.Line2D]] = []
     roi_co_lines: List[List[plt.Line2D]] = []
     roi_sa_lines: List[List[plt.Line2D]] = []
@@ -323,13 +325,13 @@ def main():
         ax.set_aspect('equal')
 
     # Layout per slider e legenda
-    plt.subplots_adjust(left=0.07, right=0.9, bottom=0.36, top=0.92, wspace=0.15)
+    plt.subplots_adjust(left=0.07, right=0.9, bottom=0.36, top=0.85, wspace=0.15)
 
     axcolor = 'lightgoldenrodyellow'
-    ax_i = plt.axes([0.07, 0.27, 0.86, 0.03], facecolor=axcolor)
-    ax_j = plt.axes([0.07, 0.23, 0.86, 0.03], facecolor=axcolor)
-    ax_k = plt.axes([0.07, 0.19, 0.86, 0.03], facecolor=axcolor)
-    ax_da = plt.axes([0.07, 0.15, 0.86, 0.03], facecolor=axcolor)
+    ax_i = plt.axes([0.07, 0.27, 0.83, 0.03], facecolor=axcolor)
+    ax_j = plt.axes([0.07, 0.23, 0.83, 0.03], facecolor=axcolor)
+    ax_k = plt.axes([0.07, 0.19, 0.83, 0.03], facecolor=axcolor)
+    ax_da = plt.axes([0.07, 0.15, 0.83, 0.03], facecolor=axcolor)
 
     s_i = Slider(ax_i, 'X (i)', 0, nx - 1, valinit=i, valfmt='%0.0f')
     s_j = Slider(ax_j, 'Y (j)', 0, ny - 1, valinit=j, valfmt='%0.0f')
@@ -362,9 +364,7 @@ def main():
             im_dose_ax.set_alpha(a)
             im_dose_co.set_alpha(a)
             im_dose_sa.set_alpha(a)
-            # Norm e ticks restano invariati: mappatura lineare fissa su [dmin, dmax]
 
-        # Aggiorna contorni ROI
         clear_lines(roi_ax_lines)
         clear_lines(roi_co_lines)
         clear_lines(roi_sa_lines)
@@ -377,7 +377,6 @@ def main():
             roi_co_lines.append(draw_contours(ax_cor, c_co, colors[ridx]))
             roi_sa_lines.append(draw_contours(ax_sag, c_sa, colors[ridx]))
 
-        # Crosshair aggiornate
         x_phys = i * sx
         y_phys = j * sy
         z_phys = k * sz
@@ -387,14 +386,13 @@ def main():
 
         fig.canvas.draw_idle()
 
-    # Collega gli slider all'update
     s_i.on_changed(update)
     s_j.on_changed(update)
     s_k.on_changed(update)
     s_da.on_changed(update)
 
     # ===== Zoom & Pan interattivi =====
-    base_scale = 1.2  # fattore di zoom per step rotella
+    base_scale = 1.2
 
     def on_scroll(event):
         if event.inaxes not in {ax_axial, ax_cor, ax_sag}:
@@ -417,7 +415,7 @@ def main():
     pan_state = {'active': False, 'ax': None, 'x0': None, 'y0': None, 'xlim0': None, 'ylim0': None}
 
     def on_button_press(event):
-        if event.button != 3:  # tasto destro = pan
+        if event.button != 3:
             return
         if event.inaxes not in {ax_axial, ax_cor, ax_sag}:
             return
@@ -450,7 +448,6 @@ def main():
 
     def on_key_extra(event):
         if event.key == '0':
-            # reset limiti ai extent fisici originali
             ax_axial.set_xlim(ext_ax[0], ext_ax[1])
             ax_axial.set_ylim(ext_ax[2], ext_ax[3])
             ax_cor.set_xlim(ext_co[0], ext_co[1])
@@ -465,7 +462,6 @@ def main():
     fig.canvas.mpl_connect('motion_notify_event', on_motion)
     fig.canvas.mpl_connect('key_press_event', on_key_extra)
 
-    # Scorciatoie tastiera per slicing
     step = 1
     def on_key(event):
         if event.key == 'left':
@@ -483,6 +479,11 @@ def main():
 
     fig.canvas.mpl_connect('key_press_event', on_key)
 
+    # ======================================================================
+    # --- TITOLO INTERNO ALLA FIGURA ---
+    fig.suptitle(titolo_pulito, fontsize=14, fontweight='bold', y=0.96)
+    # ======================================================================
+    
     # Leggenda ROI
     legend_handles = [plt.Line2D([0], [0], color=colors[i], lw=2.5, label=labels[i]) for i in range(len(roi_arrays))]
     ncol = min(len(legend_handles), 6)
