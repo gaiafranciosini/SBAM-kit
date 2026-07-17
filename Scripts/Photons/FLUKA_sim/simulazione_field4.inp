@@ -1,0 +1,51 @@
+TITLE
+Simulazione 10 MeV Elettroni + Targhetta + FF
+DEFAULTS                                                              PRECISIO
+BEAM           -0.02                       -0.3014   -0.3014          ELECTRON
+BEAMPOS      78.0843  -25.5577  -136.014       0.0       0.0
+SOURCE           -2.                                                  10MeV
+EMF
+ROT-DEFI        101.                 90.                              TF1
+ROT-DEFI          1.          71.9999254                              TF1
+ROT-DEFI          1.                       78.0843  -25.5577  -136.014TF1
+EMFCUT       -0.0003     1.E-5       0.5  BLCKHOLE  @LASTMAT        1.PROD-CUT
+EMFCUT       -0.0003     1.E-5                 OUT  @LASTREG        1.
+GEOBEGIN                                                              COMBNAME
+    0    0          
+SPH main       0.0 0.0 0.0 500.
+SPH cnero      0.0 0.0 0.0 350.
+$start_transform 
+RCC LinacTi    0.0 0.0 0.0 0.0 0.0 0.006 1.4
+RCC TaDisc     0.0 0.0 0.006 0.0 0.0 0.1 1.4
+RCC AlDisc     0.0 0.0 0.106 0.0 0.0 1.9 4.0
+RCC AirBet     0.0 0.0 0.106 0.0 0.0 0.1 1.0
+RCC VacLinac   0.0 0.0 -10.0 0.0 0.0 10.0 6.
+RPP air        -2.5 2.5 -2.5 2.5 200. 220.
+RCC C1         0.0 0.0 2. 0.0 0.0 5. 4.0
+RPP C2         -0.5 0.5 -0.5 0.5 2. 7.
+END
+OUT          5 +main -cnero
+VAC          5 +cnero  -TaDisc -AlDisc -LinacTi -VacLinac -AirBet -C1 -C2
+Ta           5 TaDisc
+Al           5 AlDisc -AirBet -C1
+Ti           5 +LinacTi
+AirBet       5 +AirBet
+VacLinac     5 +VacLinac
+C1           5 +C1 -C2
+C2           5 +C2
+END
+GEOEND
+ASSIGNMA    BLCKHOLE       OUT
+ASSIGNMA         AIR       VAC
+ASSIGNMA    TANTALUM        Ta
+ASSIGNMA    ALUMINUM        Al
+ASSIGNMA    TITANIUM        Ti
+ASSIGNMA         AIR    AirBet
+ASSIGNMA      VACUUM  VacLinac
+ASSIGNMA    TUNGSTEN        C1
+ASSIGNMA         AIR        C2
+USRBIN           10.      DOSE      -21. 33.136604 32.999874-104.74999dose
+USRBIN       -33.018 -33.15053   -159.95      512.      512.      184. &
+RANDOMIZ                3000.0
+START            1E6
+STOP

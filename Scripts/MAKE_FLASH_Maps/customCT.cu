@@ -1,0 +1,251 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <cstdio>
+#include <cstdlib>
+#include "mhd_io.h"
+#include <vector>
+
+using namespace std;
+
+__global__ void replaceHU(int *Nvxl, int *nn, float *hs, float *x0,float32* dose, float32 *dose1, float32 *dose2, float32* dose3, float *dose4,float32 *dose5, int16 *ptv, float32 *doserate1, float32 *doserate2, float32 *doserate3, float32 *doserate4,float32 *doserate5)
+{   
+  int ivxl = blockIdx.x*blockDim.x + threadIdx.x;
+  if(ivxl>=*Nvxl) return;
+  
+  int ix=(ivxl%(nn[0]*nn[1]))%nn[0];
+  int iy=(ivxl%(nn[0]*nn[1]))/nn[0];
+  int iz=(ivxl/(nn[0]*nn[1]));
+
+  float x=x0[0]+(ix+0.5)*hs[0];
+  float y=x0[1]+(iy+0.5)*hs[1];
+  float z=x0[2]+(iz+0.5)*hs[2];
+
+  /*  float FMFmin = 0.6;
+  float FMFmin_l = 0.12;
+  float DT = 6; //6 Gy per fraction
+  float DT_l = 13; //6 Gy per fraction
+  float DrT=40.;
+  float FMF = 0.;
+
+  float Dtot_flash = 0.0;//dose1[ivxl]+dose2[ivxl]+dose3[ivxl]+dose4[ivxl];
+  float Dtot_no_flash = 0.0;//dose1[ivxl]+dose2[ivxl]+dose3[ivxl]+dose4[ivxl];
+  */
+  int Nfrac = 5;
+  float FMFmin = 0.6;
+  
+  float DT = 5; //6 Gy per fraction                                                                                     
+  
+  float DrT=10.;
+  float FMF = 0.;
+
+  float Dtot_flash = 0.0;//dose1[ivxl]+dose2[ivxl]+dose3[ivxl]+dose4[ivxl];                                             
+  float Dtot_no_flash = 0.0;//dose1[ivxl]+dose2[ivxl]+dose3[ivxl]+dose4[ivxl];                                          
+
+  
+  const float DT_eff =  DT;
+  const float FMFmin_eff =  FMFmin;
+
+  float EffectiveD1=0.;
+  float EffectiveD2=0.;
+  float EffectiveD3=0.;
+  float EffectiveD4=0.;
+  float EffectiveD5=0.;
+ 
+  if(doserate1[ivxl]>DrT){
+    Dtot_flash += dose1[ivxl];
+  }else{
+    Dtot_no_flash += dose1[ivxl];
+  }
+  if(doserate2[ivxl]>DrT){
+    Dtot_flash += dose2[ivxl];
+  }else{
+    Dtot_no_flash += dose2[ivxl];
+  }
+  if(doserate3[ivxl]>DrT){
+    Dtot_flash += dose3[ivxl];
+  }else{
+    Dtot_no_flash += dose3[ivxl];
+  }
+  if(doserate4[ivxl]>DrT){
+    Dtot_flash += dose4[ivxl];
+  }else{
+    Dtot_no_flash += dose4[ivxl];
+  }
+   if(doserate5[ivxl]>DrT){
+    Dtot_flash += dose5[ivxl];
+  }else{
+    Dtot_no_flash += dose5[ivxl];
+  }
+
+  if(ptv[ivxl]<1){
+    if(Dtot_flash > DT_eff){
+      FMF = (1.0f - FMFmin_eff) * (DT_eff / Dtot_flash) + FMFmin_eff;
+      dose[ivxl] = (Dtot_flash * FMF + Dtot_no_flash) * Nfrac;
+    }else{
+      dose[ivxl] = (dose1[ivxl] + dose2[ivxl] + dose3[ivxl] + dose4[ivxl]+dose5[ivxl]) * Nfrac;
+    }
+  }else{
+      dose[ivxl] = (dose1[ivxl] + dose2[ivxl] + dose3[ivxl] + dose4[ivxl]+dose5[ivxl]) * Nfrac;
+    }
+
+  /*if(Dtot_flash>DT || Dtot_flash > DT_l){
+    FMF = 1;
+    if(lung[ivxl] > 0){
+      if (Dtot_flash>DT_l){
+	FMF =(1-FMFmin_l)*DT_l/Dtot_flash+FMFmin_l;
+      }else{
+	FMF = 1;
+      }
+    }else{
+      if(Dtot_flash > DT){
+	FMF =(1-FMFmin)*DT/Dtot_flash+FMFmin;
+      }else{
+	FMF = 1.;
+      }
+    }
+    dose[ivxl]= (Dtot_flash*FMF + Dtot_no_flash)*3;
+  }else{
+    dose[ivxl]=(dose1[ivxl]+dose2[ivxl]+dose3[ivxl]+dose4[ivxl])*3;
+    }*/
+
+  
+}
+
+
+__host__ int main(int argc, char *argv[]){
+
+  
+
+  float L[3];
+  float left[3], up[3], front[3];
+
+  vector<float32> Dose;
+  
+  vector<float32> Dose1;
+  vector<float32> Dose2;
+  vector<float32> Dose3;
+  vector<float32> Dose4;
+  vector<float32> Dose5;
+
+  
+  vector<float32> DoseRate1;
+  vector<float32> DoseRate2;
+  vector<float32> DoseRate3;
+  vector<float32> DoseRate4;
+  vector<float32> DoseRate5;
+
+
+  vector<int16> PTV;
+
+    
+
+  float *x0;
+  float *hs;
+  int *nn;
+  int *Nvxl;
+  
+  cudaMallocManaged(&nn,3*sizeof(int)); // alloca la memoria condivisa
+  cudaMallocManaged(&hs,3*sizeof(float)); // alloca la memoria condivisa
+  cudaMallocManaged(&x0,3*sizeof(float)); // alloca la memoria condivisa
+  cudaMallocManaged(&Nvxl,sizeof(int)); // alloca la memoria condivisa
+  
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/Dose_opti_field1.mhd",Dose1, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/Dose_opti_field2.mhd",Dose2, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/Dose_opti_field3.mhd",Dose3, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/Dose_opti_field4.mhd",Dose4, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/Dose_opti_field5.mhd",Dose5, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/Dose_opti_field1.mhd",Dose, nn, x0, L,left,up,front);
+
+  
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/rate_field_0.mhd",DoseRate1, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/rate_field_1.mhd",DoseRate2, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/rate_field_2.mhd",DoseRate3, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/rate_field_3.mhd",DoseRate4, nn, x0, L,left,up,front);
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/rate_field_4.mhd",DoseRate5, nn, x0, L,left,up,front);
+  
+  
+  read_mhd("/NFS_homes/gaia/SBAM-kit/Scripts/PHOTONS_FLASH/MakeFlash/PTV_int.mhd",PTV, nn, x0, L,left,up,front);
+
+    
+
+  *Nvxl = nn[0]*nn[1]*nn[2];
+
+  printf("Nvxl::%d\n", *Nvxl);
+  for(int i=0;i<3;i++){
+    hs[i] = L[i]/(float)nn[i]/10.;
+    x0[i]/=10.;
+    printf("L[%d] = %f\n", i, L[i]);
+    printf("hs[%d] = %f\n", i, hs[i]);
+    printf("X0[%d] = %f\n", i, x0[i]);
+  }
+  
+
+  float32* dose;
+  cudaMallocManaged(&dose,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)dose[i]=Dose.at(i);
+  
+  float32* dose1;
+  cudaMallocManaged(&dose1,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)dose1[i]=Dose1.at(i);
+
+  float32* dose2;
+  cudaMallocManaged(&dose2,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)dose2[i]=Dose2.at(i);
+
+  float32* dose3;
+  cudaMallocManaged(&dose3,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)dose3[i]=Dose3.at(i);
+
+  float32* dose4;
+  cudaMallocManaged(&dose4,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)dose4[i]=Dose4.at(i);
+
+    float32* dose5;
+  cudaMallocManaged(&dose5,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)dose5[i]=Dose5.at(i);
+
+  
+
+  float32* doserate1;
+  cudaMallocManaged(&doserate1,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)doserate1[i]=DoseRate1.at(i);
+
+  float32* doserate2;
+  cudaMallocManaged(&doserate2,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)doserate2[i]=DoseRate2.at(i);
+
+  float32* doserate3;
+  cudaMallocManaged(&doserate3,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)doserate3[i]=DoseRate3.at(i);
+
+  float32* doserate4;
+  cudaMallocManaged(&doserate4,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)doserate4[i]=DoseRate4.at(i);
+
+    float32* doserate5;
+  cudaMallocManaged(&doserate5,(*Nvxl)*sizeof(float32)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)doserate5[i]=DoseRate5.at(i);
+
+  
+  
+  int16* ptv;
+  cudaMallocManaged(&ptv,(*Nvxl)*sizeof(int16)); // alloca la memoria condivisa
+  for(int i=0;i<*Nvxl;i++)ptv[i]=PTV.at(i);
+
+
+  
+  int NT = 32;
+  int NB = (*Nvxl/NT)+1;
+  
+  replaceHU <<< NB,NT >>> (Nvxl, nn, hs, x0,dose,dose1,dose2,dose3,dose4,dose5,ptv,doserate1,doserate2,doserate3,doserate4,doserate5);
+  cudaDeviceSynchronize();
+    
+  for(int i=0;i<3;i++){
+    x0[i]*=10.;
+  }
+  
+  write_mhd("FLASH_1000.mhd", dose, nn, x0, L, left,up,front);
+  
+  
+  return 0;
+}

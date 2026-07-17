@@ -1,0 +1,349 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <time.h>
+#include <math.h>
+#include <sys/time.h>
+
+#include <TROOT.h>
+#include <TTree.h>
+#include <TFile.h>
+#include <TDirectory.h>
+#include <TH1D.h>
+#include <TH2D.h>
+#include <TF2.h>
+#include <TRandom.h>
+#include <TGraph.h>
+#include <TProfile.h>
+#include <TString.h>
+#include <stdio.h>
+
+#include <string>
+#include <fstream>
+#include <iostream>
+#include <ostream>
+#include <sstream>
+
+#include "Evento.h"
+#include "EventStruct.h"
+#include "AnaFluka.h"
+
+using namespace std;
+int index_of_event=0;
+ofstream Frag("Frag.txt");
+
+/*----------------------------------------------------------------*/
+
+  int main(int argc, char *argv[]){
+  int NumEvTot=0, currentev=0, status = 0, NumEvFile=0, iL=0;
+  int NumProcessed=0, numfiles = 0, Nloop=0;
+  double AnormGanil[MAXFRAG] = {0};
+  double AnormCross[MAXFRAG] = {0};
+  double RatioCross[MAXFRAG] = {0};
+  
+  TTree *ptree ;  
+  TFile *f_input ;
+  FILE *pfile;
+ 
+  
+  TString outname("Out.root"), inname("In.root"), parname("Out.par"), stringa;
+  TString txtname ("File.txt");
+  vector<TString> infiles; TString tmpSin;
+  
+  double Emax=10.0;
+  ifstream lista_file;
+
+  char fname[200],linea[200];
+
+  for (int i = 0; i < argc; i++){
+    if(strcmp(argv[i],"-nev") == 0) {   // Number of events 
+      NumEvTot = atoi(argv[++i]);
+    }          
+    if(strcmp(argv[i],"-in") == 0) {   // Input file name for data root file
+      inname = TString(argv[++i]);  
+    }                              
+    if(strcmp(argv[i],"-out") == 0) {   // Output file name for root output
+      outname = TString(argv[++i]);
+    }
+     if(strcmp(argv[i],"-txt") == 0) {   // Output file name for root output
+      txtname = TString(argv[++i]); 
+    }            
+    if(strcmp(argv[i],"-iL") == 0)  { iL = 1; } //Accept list of files to analize
+    if(strcmp(argv[i],"-deb") == 0) { idbflg = atoi(argv[++i]); }           
+    if(strcmp(argv[i],"-help") == 0) { 
+      cout<<"Analysis of FLUKA sim data: usage -> AnaHITMay [opts] "<<endl;
+      cout<<" possible opts are:"<<endl;
+      cout<<"   -nev   value : [def=all] Numbers of events to process"<<endl;
+      cout<<"   -in  file    : [def=In.root] Root input file"<<endl;
+      cout<<"   -out  file   : [def=Out.root] Root output file"<<endl;
+      cout<<"   -iL        : [def=none] input file is a list of files"<<endl;
+      cout<<"   -deb value   : [def=0] Enables debugging"<<endl;
+      return 1;
+    }
+  }
+  
+  if(iL==0) { 
+    infiles.push_back(inname); //if is directly the file save the name
+  } else {//if is a list of files, take all the files
+    lista_file.open(inname.Data());
+    cout<<"Processing data from "<<inname.Data()<<" LIST file!"<<endl;
+    while (lista_file.getline(linea, 200, '\n')) {
+      sscanf(linea,"%s",fname);
+      cout<<"Adding "<<fname<<" to the list of files to be processed!"<<endl;
+      tmpSin= fname;
+      infiles.push_back(tmpSin);
+    }
+    lista_file.close();
+  }  
+  numfiles = infiles.size();
+  
+  
+  EVENTO_STRUCT  *pevstr = new EVENTO_STRUCT;
+  ANA_STRUCT  *panastr = new ANA_STRUCT;
+  caso.SetSeed(0);
+  TFile *f_out = new TFile(outname,"RECREATE");
+  ofstream MyFile (txtname);
+  status = Booking(f_out,Emax);
+  if(iparwri>0){
+    pfile = fopen(parname,"wr");
+  }
+ 
+  /*  
+      ------------------   End of the initialization and start the analysis:  ------------
+      LOOP on the input files 
+  */
+
+
+ for(int idfile=0; idfile<numfiles;idfile++){
+    cout<<endl<<"Now processing data from "<<infiles.at(idfile)<<" file!"<<endl;
+    //  TFile *f_input = new TFile(inname);
+    f_input = new TFile(infiles.at(idfile));
+    f_input->cd();
+    f_input->GetObject("EventTree",ptree);
+    Evento *pEv = new Evento();
+    status = pEv->FindBranches(ptree,pevstr);
+    NumEvFile = ptree->GetEntries();
+    cout<<"numero eventi file= "<<NumEvFile<<endl;
+    f_out->cd();
+
+    if((NumEvTot!=0)&&((NumProcessed+NumEvFile)>NumEvTot)){
+      Nloop = NumEvTot-NumProcessed; }
+    else{ Nloop = NumEvFile; }
+    
+    
+    /*------------   loop sugli eventi del file di input  ---------------*/
+ 
+     for (int kk=0;kk<Nloop;kk++){
+          NumProcessed++;
+	 
+      if(NumProcessed%100000==0){ cout<<"Processed event = "<<NumProcessed<<endl;}
+     
+      status = pEv->Clean();
+      
+      status = Clean_Ana(panastr);
+      
+      currentev = ptree->GetEvent(kk);
+    
+      status = Fragments(pevstr, panastr,MyFile);
+     
+      //status = ParticleLoop(pevstr, panastr);
+     }
+     f_input->Close();
+ }
+    
+  f_out->cd();
+  f_out->Write();
+  f_out->Close();
+  MyFile.close();
+  
+  return 0;
+  
+  }
+/*-------------------------------------------------------*/
+
+int Fragments(EVENTO_STRUCT *pevstr,ANA_STRUCT *panastr,ofstream &MyFile){
+ 
+  int status = 0;
+  int ipoi_par=0, ipoi_dad=0, FluID=-1;
+  int iA = 0, iA_dad = 0, iZ=0, IDfrag=-1;
+  int ncharged=0, nneutron=0, nproton=0;
+  int numhad[10]={0};
+  
+  double Ekin = 0.;
+  double EtotPhotons=0, EtotElectrons=0;
+  double theta = 0, amass=0. , Ekin_nucl=0.;
+  double pcross=0, pcrossPROD=0, EkinBeam = 0, pBeam=0;
+  
+  TString stringa;
+
+  int d = 0;
+
+  /*
+    crossing analysis
+  */
+  
+  index_of_event++;
+ 
+
+  for(int nc=0; nc<pevstr->ncross;nc++){
+    // selezione le particelle che escono dal target nell'aria
+    //if(pevstr->nregcross[nc]==nregroom && (pevstr->nregold[nc]==nregtube || pevstr->nregold[nc]==nregcyl)){
+
+      //ipoi_par = pevstr->idcross[nc]-1;
+      //FluID = pevstr->idcross[nc];
+    //	  cout<<"sono qui"<<endl;
+      //modulo dell'impulso della particella che sta uscendo
+      pcross = sqrt((pevstr->pxcross[nc]*pevstr->pxcross[nc])+
+		    (pevstr->pycross[nc]*pevstr->pycross[nc])+
+		  (pevstr->pzcross[nc]*pevstr->pzcross[nc]));
+
+      //energia della particella che sta uscendo
+      amass = pevstr->mcross[nc];                               
+      Ekin = sqrt(amass*amass + pcross*pcross) - amass;
+      
+      float uy = pevstr->pycross[nc]/pcross;
+      float ux = pevstr->pxcross[nc]/pcross;
+      float uz = pevstr->pzcross[nc]/pcross;
+      int idpart = 0;
+
+      if(pevstr->chcross[nc]==-1) idpart = 1;
+      if(pevstr->chcross[nc]==1) idpart = 2;
+      if(pevstr->chcross[nc]==0) idpart = 3;
+      
+      //cout<<idpart<<" "<<pevstr->xcross[nc]<<" "<<pevstr->ycross[nc]<<" "<<pevstr->zcross[nc]<<"  "<<ux<<" "<<uy<<" "<<uz<<" "<<Ekin*1000<<endl;
+      MyFile<<idpart<<" "<<pevstr->xcross[nc]<<" "<<pevstr->ycross[nc]<<" "<<pevstr->zcross[nc]-66.85<<"  "<<ux<<" "<<uy<<" "<<uz<<" "<<Ekin*1000<<endl;
+      
+      ((TH1D*)gDirectory->Get("Particles_charge"))->Fill(pevstr->chcross[nc]);
+      ((TH1D*)gDirectory->Get("Particles_mass"))->Fill(pevstr->mcross[nc]);
+
+      if(pevstr->chcross[nc] == -1){
+	((TH1D*)gDirectory->Get("/ELECTRON/Ekin"))->Fill(Ekin*1000);
+	((TH1D*)gDirectory->Get("/ELECTRON/pcross"))->Fill(pcross);
+	((TH1D*)gDirectory->Get("/ELECTRON/xcross"))->Fill(pevstr->xcross[nc]);
+	((TH1D*)gDirectory->Get("/ELECTRON/ycross"))->Fill(pevstr->ycross[nc]);
+	((TH1D*)gDirectory->Get("/ELECTRON/zcross"))->Fill(pevstr->zcross[nc]);
+	((TH1D*)gDirectory->Get("/ELECTRON/uxcross"))->Fill(ux);
+	((TH1D*)gDirectory->Get("/ELECTRON/uycross"))->Fill(uy);
+	((TH1D*)gDirectory->Get("/ELECTRON/uzcross"))->Fill(uz);
+	
+
+      }else if(pevstr->chcross[nc] == 0){          
+	((TH1D*)gDirectory->Get("/PHOTON/Ekin"))->Fill(Ekin*1000);
+	((TH1D*)gDirectory->Get("/PHOTON/pcross"))->Fill(pcross);
+	((TH1D*)gDirectory->Get("/PHOTON/xcross"))->Fill(pevstr->xcross[nc]);
+	((TH1D*)gDirectory->Get("/PHOTON/ycross"))->Fill(pevstr->ycross[nc]);
+	((TH1D*)gDirectory->Get("/PHOTON/zcross"))->Fill(pevstr->zcross[nc]);
+	((TH1D*)gDirectory->Get("/PHOTON/uxcross"))->Fill(ux);
+	((TH1D*)gDirectory->Get("/PHOTON/uycross"))->Fill(uy);
+	((TH1D*)gDirectory->Get("/PHOTON/uzcross"))->Fill(uz);
+      }
+    }     
+  // }
+  return status;
+}
+/*=========================================================================*/
+
+int ParticleLoop(EVENTO_STRUCT *pevstr,ANA_STRUCT *panastr){
+  int status = 0;
+  int Nump = 0;
+  Double_t secEkin=0.;
+  int parent =0;
+  Double_t secMomentum=0.;
+  Nump = pevstr->nump;
+  index_of_event++;
+  Int_t parent_jpa = 0;
+  Int_t secondary_jpa=0;
+
+   parent=pevstr->idpa[0];
+   parent_jpa=pevstr->jpa[0];
+   
+  
+   for (int sec = 0; sec<Nump; sec++){
+     secondary_jpa=pevstr->jpa[sec];
+     secMomentum = sqrt(pevstr->px[sec]*pevstr->px[sec] + pevstr->py[sec]*pevstr->py[sec] +pevstr->pz[sec]*pevstr->pz[sec]);
+     secEkin = sqrt( pevstr->amass[sec]*pevstr->amass[sec] + secMomentum*secMomentum) - pevstr->amass[sec];
+   }
+  
+
+  return status;
+}
+
+
+
+/*========================================================*/
+
+int Booking(TFile *f_out,double Emax){
+
+  //  char name[100], title[100];  
+  TString nome_h2, title_h2;
+ 
+  /*
+    fragments exiting from the box
+  */
+  
+  h = new TH1D("Particles_charge","Partiles charge", 3,-1,1);
+  h = new TH1D("Particles_mass","Partiles charge", 50,0,1e-3);
+
+  f_out->mkdir("PHOTON");
+  f_out->cd("PHOTON");
+  h = new TH1D("Ekin","Kinetic energy", 1000,0,12);
+  h = new TH1D("pcross","P", 1000,0,1);
+  h = new TH1D("xcross","P_x", 1000,-6,6);
+  h = new TH1D("ycross","P_y", 1000,-6,6);
+  h = new TH1D("zcross","P_z", 1000,30,70);
+  h = new TH1D("uxcross","ux", 1000,-1,1);
+  h = new TH1D("uycross","uy", 1000,-1,1);
+  h = new TH1D("uzcross","uz", 1000,-1,1);
+  f_out->cd();
+  
+  f_out->mkdir("ELECTRON");
+  f_out->cd("ELECTRON");
+   h = new TH1D("Ekin","Kinetic energy", 1000,0,12);
+  h = new TH1D("pcross","P", 1000,0,1);
+   h = new TH1D("xcross","P_x", 1000,-6,6);
+  h = new TH1D("ycross","P_y", 1000,-6,6);
+  h = new TH1D("zcross","P_z", 1000,30,70);
+  h = new TH1D("uxcross","ux", 1000,-1,1);
+  h = new TH1D("uycross","uy", 1000,-1,1);
+  h = new TH1D("uzcross","uz", 1000,-1,1);
+  
+ 
+  f_out->cd();
+  
+  return 0; 
+}
+
+/*========================================================*/
+
+int Clean_Ana(ANA_STRUCT *panastr){
+  /*
+    clean up of the analysis structure: to be called each event
+*/
+  panastr->num_bplus=0;
+  for( int ii = 0;ii<MAXBPLUS;ii++){
+    panastr->vxi[ii] = 0.;
+    panastr->vyi[ii] = 0.;
+    panastr->vzi[ii] = 0.;
+    panastr->tprod[ii] = 0.;
+    panastr->tdec[ii] = 0.;
+    panastr->pxplus[ii] = 0.;
+    panastr->pyplus[ii] = 0.;
+    panastr->pzplus[ii] = 0.;
+    panastr->pxminus[ii] = 0.;
+    panastr->pyminus[ii] = 0.;
+    panastr->pzminus[ii] = 0.;
+
+  }
+
+  return 0;
+}
+
+/*----------------------------------------------------------*/
+int PrintOut(EVENTO_STRUCT *pevstr, int DumpFlag){
+
+  int Irisp = 0;
+  cout<< "Nuovo evento? = (1/-1) 1= yes / -1 = exit"<<endl;
+  cin>>Irisp;
+  return Irisp;
+}
+

@@ -1,0 +1,77 @@
+#ifndef ANAFLUKA_H
+#define ANAFLUKA_H
+
+
+#define GEV2MEV  1000
+#define SEC2NS   1.0e9
+#define CLIGHT   29.8 
+#define DEG2RAD 0.01745289
+
+/*  valori delle regioni (fare il check sul .log del run di sim... )*/
+// 10 mm const int nregroom = 31, nregtube=11, nregcyl=28;
+const int nregroom = 2, nregtube=10
+const int JPAPOSITRON = 4, JPAELECTRON = 3 , JPAPHOTON =7 , JPANEUTRON = 8;
+/* max distance bethween the pencil beam and
+   the reconstructed proton direction
+ */
+const double EminFrag=0.005;
+const int MAXFRAG = 100000;
+vector<TString> lista_frag {
+                    "1H","2H","3H","3He","4He","6He","6Li","7Li","7Be","9Be","10Be",
+		      "8B","10B","11B","10C","11C","12C","n"} ;
+vector<int> lista_Z {1,  1,  1,  2,  2,  2,  3,  3,  4,  4,   4,  5,  5,  5,  6,  6,  6, 0};
+vector<int> lista_A {1,  2,  3,  3,  4,  6,  6,  7,  7,  9,  10,  8, 10, 11, 10, 11, 12, 1};
+vector<double> lista_EtotThr{ 4.0,5.2,6.1,14.2,16.0,18.6,29.9,31.7,44.3,48.6,50.5,60.6,65.8,68.1, 81.3, 84.2,86.9};
+
+const int nparg2D=5;
+const int NbinAngle= 20, NbinEn = 79;
+const double EkinBeam = 95;
+const double Emin = 0;
+const double MinThetaPeak = 0;
+const double MaxThetaPeak = 30;
+const double ErrTheta = 1;
+const double BinWidthAngle = 2, BinWidthEkin = 5;
+
+double EkinNuclBeam=0;
+double AngleMin = 0, AngleMax=90, EnMin = 3, EnMax= 750;
+
+const int MAXBPLUS= 10000;
+typedef struct {
+  int num_bplus;
+  double vxi[MAXBPLUS];
+  double vyi[MAXBPLUS];
+  double vzi[MAXBPLUS];
+  double tprod[MAXBPLUS];
+  double tdec[MAXBPLUS];
+  double pxplus[MAXBPLUS];
+  double pyplus[MAXBPLUS];
+  double pzplus[MAXBPLUS];
+  double pxminus[MAXBPLUS];
+  double pyminus[MAXBPLUS];
+  double pzminus[MAXBPLUS];
+
+} ANA_STRUCT;
+
+TH1D *h;
+TH2D *h2, *h2_fit;
+TProfile *hp;
+TRandom caso;
+
+/*  run related quantities */
+int  idbflg= 0;
+int  iparwri = 0;
+
+int Booking(TFile *f_out,double Emax);
+int Clean_Ana(ANA_STRUCT *panastr);
+int ParticleLoop(EVENTO_STRUCT *pevstr, ANA_STRUCT *panastr);
+int Fragments(EVENTO_STRUCT *pevstr, ANA_STRUCT *panastr, ofstream &MyFile);
+int Betaplus(EVENTO_STRUCT *pevstr, ANA_STRUCT *panastr);
+//int FittingCross(TFile *f_out, FILE *pfile);
+//int Fit_Gauss_ExpROT(TH2D* h2, double *poi_par);
+//int Fit_Gauss(TH2D* h2, double *poi_par);
+//Double_t cross_fit(Double_t *x, Double_t *par);
+//Double_t cross_gauss(Double_t *x, Double_t *par);
+//Double_t sum_gauss_espoROT(Double_t *x, Double_t *par) ;
+//Double_t gauss2D(Double_t *x, Double_t *par) ;
+
+#endif

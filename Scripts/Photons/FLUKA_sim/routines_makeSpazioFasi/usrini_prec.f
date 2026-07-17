@@ -1,0 +1,106 @@
+*$ CREATE USRINI.FOR
+*COPY USRINI
+*
+*=== usrini ===========================================================*
+*
+      SUBROUTINE USRINI ( WHAT, SDUM )
+
+      INCLUDE '(DBLPRC)'
+      INCLUDE '(DIMPAR)'
+      INCLUDE '(IOUNIT)'
+*
+*----------------------------------------------------------------------*
+*                                                                      *
+*     Copyright (C) 1991-2005      by    Alfredo Ferrari & Paola Sala  *
+*     All Rights Reserved.                                             *
+*                                                                      *
+*                                                                      *
+*     USeR INItialization: this routine is called every time the       *
+*                          USRICALL card is found in the input stream  *
+*                                                                      *
+*                                                                      *
+*     Created on 01 january 1991   by    Alfredo Ferrari & Paola Sala  *
+*      Infn -     Milan                                                *
+*                                                                      *
+*     Last change on 20-mar-05     by    Alfredo Ferrari               *
+*                                                                      *
+*                                                                      *
+*----------------------------------------------------------------------*
+*
+      DIMENSION WHAT (6)
+      CHARACTER SDUM*8
+
+c
+      INCLUDE '(FLKMAT)'
+      include "mgdraw.inc"
+      character*8 REGNAM
+      CHARACTER*8 LATNAM
+      double precision latofibre
+
+      integer jj, id
+*
+*
+c      write(*,*)"sono in usrini"
+*  Don't change the following line:
+      LUSRIN = .TRUE.
+* *** Write from here on *** *
+c
+      idbflg = int(what(1))
+      ifragflag = int(what(2))
+c 
+c  init of geometry parameters
+c
+c
+      write(*,*)" "
+      write(*,*)"  ---- USRINI  -------"
+      write(*,*)" "
+c
+      outunit=60
+      open(unit=outunit,file='TXT.dat',form='formatted',status='new')
+c
+c find the region number of the region of interest
+c
+      nregvuoto = 0
+      nregfanto = 0
+      
+      do ii = 1,NREGS
+         call GEOR2N ( ii, REGNAM, IERR )
+         if(ierr.eq.0) then
+            if(REGNAM(1:5).eq.'VUOTO') then
+               nregvuoto = ii
+            elseif(REGNAM(1:5).eq.'FANTO') then
+               nregfanto = ii
+            endif
+         endif
+      end do
+      write(*,*)'======================================'
+      write(*,*)'USRINI: idbflg =  ',idbflg,' ifragflag= ',ifragflag
+      write(*,*) ' '
+      write(*,*) ' nregvuoto =  ',nregvuoto,' nregfanto= ',nregfanto
+c
+      nregcounter=nregvuoto*nregfanto
+      if(nregcounter.eq.0) then
+         write(*,*)'**************** Fine Geometria *******************'
+         write(*,*)''
+         write(*,*)'Non ho trovato tutte le regioni!!!!'
+         Call FLABRT('USRINI','One or more regions could not be found!')
+      else
+         write(*,*)'**************** Fine Geometria *******************'
+         write(*,*)''
+         write(*,*)'Ho trovato tutte le regioni!!!!'
+      endif
+      write(*,*)' '
+      write(*,*)'======================================'
+
+c
+c init of the root interface
+c
+c      CALL myusrini();
+c     
+c      write(*,*)"esco da usrini"
+
+      RETURN
+*===  End of subroutine Usrini ================================*
+
+      END
+

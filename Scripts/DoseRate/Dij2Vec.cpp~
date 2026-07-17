@@ -1,0 +1,1070 @@
+const char *version = "1.0";
+#include <iostream>
+#include <cstdlib>
+#include <cstring>
+#include <fstream>
+#include <cstdarg>
+#include <ctime>
+#include <vector>
+#include <algorithm>
+using namespace std;
+#include "types.h"
+#include "vector3d.h"
+#include <pthread.h>
+#include <map>
+#include "mhd_io.h"
+#include "Voxels.h"
+
+#include <iostream>
+#include <fstream>
+
+#include "TH1D.h"
+#include "TTree.h"
+#include "TROOT.h"
+#include "TFile.h"
+#include "TCanvas.h"
+
+string lastParsedParameter,lastParsedDefinition;
+
+double getTime(int fi, int pb);
+vector<string> readLines(const string &fname, bool skipEmpty=true, bool trimLeft=true, bool stripComments=true);
+vector<string> strtokens(const string &str,const char *sep = " \t");
+bool emptyline(const string &s);
+bool isInteger(const string &s, long *val=NULL);
+bool isNumeric(const string &s, double *val=NULL);
+string ltrim(const string &s);
+void ltrim(string &s);
+bool isComment(string s,const vector<string> &comments);
+int getIntParam(vector<string> args,string name,int & val,int def);
+int getFloatParam(vector<string> args,string name,float & val,float def);
+
+int getIntParamRequired(vector<string> args,string name,int & val);
+int getFloatParamRequired(vector<string> args,string name,float & val);
+
+
+ifstream fin;	
+float prf, interfield;
+
+vec3dRT xmin_A, xmin_B;
+i3d nn_A, nn_B;
+vec3dRT hs_A, hs_B;
+vec3dRT xmax_A, xmax_B;
+
+int maxlevel;
+
+int nnnew[3];
+float hsnew[3];
+vector<int> pbperfield;
+vector<const char *> args;
+
+void banner(){
+	cout<<endl;
+	cout<<"+------------------------------------------------------------------------------+"<<endl;
+	cout<<"|                               Dose Rate                                      |"<<endl;
+	cout<<"|                                                                              |"<<endl;
+	cout<<"|                       devo un favore a G. Franciosini                        |"<<endl;
+	cout<<"+------------------------------------------------------------------------------+"<<endl;
+	cout<<endl;
+
+}
+
+int main(int argc, char *argv[]){
+
+
+  string configname("conf.txt");
+  //Read input flags
+  int lastA(0);
+  bool isAngelica = kFALSE;
+  bool doDRstudy(kFALSE);
+  for(int i=0;i<argc;i++){
+    args.push_back(argv[i]);
+    
+    if(strcmp(argv[i],"-con") == 0) { configname =TString(argv[++i]);    lastA--;  } //configfile name
+
+    if(strcmp(argv[i],"-ange") == 0) { isAngelica = kTRUE;  } //angelica style
+
+    if(strcmp(argv[i],"-doDR") == 0) { doDRstudy = kTRUE;  } //do the dose rate
+
+    lastA = i;
+  }
+
+  if(argc == 2) lastA = 1;
+
+  //Welcome banner
+  banner();
+
+  //  vector<string> lines = readLines("configfile.txt");
+  cout<<"Reading config file " <<configname<<endl;
+  vector<string> lines = readLines(configname);
+  for(auto & l : lines) cout<<l<<endl;
+  
+  int idbflg, nfields, ierr;
+  float VoxThres = 1.e-12;
+  float Nfractions = 4.;
+  int f_OARs = 0;
+  cout<<"Parsing setup: directives:"<<endl;
+  for(auto & l : lines){
+    if(l.rfind("stpFlag:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+      
+      if((ierr=getIntParamRequired(tok,"debug",idbflg))) throw ierr;
+      if(idbflg<0 || idbflg>2) throw 10;
+      
+      if((ierr=getIntParamRequired(tok,"nfields",nfields))) throw ierr;
+      if(nfields<0 || nfields>7) throw 20;
+      
+      if((ierr=getFloatParam(tok,"dvoxthresh",VoxThres,1.e-12))) throw ierr;
+      if(VoxThres==0) throw 30;
+      
+      if((ierr=getFloatParam(tok,"nfrac",Nfractions,4.))) throw ierr;
+      if(Nfractions<=0) throw 40;
+
+      if((ierr=getIntParam(tok,"OARsonly",f_OARs,0))) throw ierr;
+      if(f_OARs!=0 && f_OARs != 1) throw 50;
+    }
+  }
+  cout<<"----------------------------------------------------------------------"<<endl;
+
+
+  cout<<"----------------------------------------------------------------------"<<endl;
+
+  cout<<"Parsing input: directives:"<<endl;
+  string fpath;
+  for(auto & l : lines){
+    if(l.rfind("ptvFile:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+      fpath = tok[0].substr(0,tok[0].size());
+    }
+  }
+  cout<<" The PTV is taken from: "<<fpath.data()<<endl;
+  
+  string optfile;
+  for(auto & l : lines){
+    if(l.rfind("optFile:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+      optfile = tok[0].substr(0,tok[0].size());
+    }
+  }
+  cout<<" The optimised fluences are taken from: "<<optfile.data()<<endl;
+
+  string dijpath;
+  for(auto & l : lines){
+    if(l.rfind("dijFile:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+      dijpath = tok[0].substr(0,tok[0].size());
+    }
+  }
+  cout<<" The Dijs are taken from: "<<dijpath.data()<<endl;
+
+  string outFlag = "test";
+  for(auto & l : lines){
+    if(l.rfind("outFlag:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+      outFlag = tok[0].substr(0,tok[0].size());
+    }
+  }
+
+
+  cout<<"Parsing Dose Rate: directives:"<<endl;
+  float fmfMin, fmfThres, drThres, pulsetime; 
+  for(auto & l : lines){
+    if(l.rfind("drStudy:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+
+      if((ierr=getFloatParamRequired(tok,"fmfMin",fmfMin))) throw ierr;
+      if(fmfMin<0 || fmfMin>2) throw 10;
+      
+      if((ierr=getFloatParamRequired(tok,"fmfThres",fmfThres))) throw ierr;
+      if(fmfThres<0) throw 20;
+      
+      if((ierr=getFloatParamRequired(tok,"drThres",drThres))) throw ierr;
+      if(drThres==0) throw 30;
+
+      if((ierr=getFloatParamRequired(tok,"pulsetime",pulsetime))) throw ierr;
+      if(pulsetime==0) throw 30;
+
+      if((ierr=getFloatParamRequired(tok,"prf",prf))) throw ierr;
+      if(prf<=0) throw 40;
+
+      if((ierr=getFloatParamRequired(tok,"interfield",interfield))) throw ierr;
+      if(interfield<0) throw 40;
+    }
+  }
+  cout<<"----------------------------------------------------------------------"<<endl;
+
+  cout<<"Parsing energy field information:"<<endl;
+  long t_eneField;
+  vector<int> fieldEnergies; fieldEnergies.clear();
+  for(auto & l : lines){
+    if(l.rfind("eneFlag:")==0){
+      vector<string> tok=strtokens(l.substr(8));
+
+      for(int is=0; is<tok.size(); is++) {
+	isInteger(tok.at(is),&t_eneField);
+	fieldEnergies.push_back((int)t_eneField);
+      }
+    }
+  }
+  cout<<"----------------------------------------------------------------------"<<endl;
+  if(fieldEnergies.size() != nfields) {
+    cout<<" Wrong number of energies assigned! missing or extra field added in eneFlag directive"<<endl;
+    exit;
+  }
+  pbperfield.assign(nfields,1);
+  
+  int Debug (idbflg);
+
+  //Define the threshold
+  float threshold = VoxThres;
+  float Dose_Per_Fraction_scale = Nfractions;
+
+  //Read fluence from optmiser output
+  int f_totpbidx;  int f_field;  int f_fpbidx;  float fluence;  char buffertC[200];
+  int vox_an, vox_an2;
+  char comment[10] = "#";
+  char flName[500];
+  sprintf(flName,"%s",optfile.data());
+
+  cout<<" Reading fluences from :: "<<flName<<endl;  
+
+  ifstream tsC(flName);
+
+  vector< vector <float> > field_fluences;
+  vector< float > tmpfluence;
+  int tmpfield (1);
+  tmpfluence.clear();
+  while (tsC.getline(buffertC, 200, '\n')) {
+
+    if (comment[0] == buffertC[0])
+      continue;
+
+    //Check if Ana or Ang
+    if(!isAngelica) {
+      sscanf(buffertC, "%d\t%d\t%d\t%f",&f_totpbidx,&f_field,&f_fpbidx,&fluence);
+    } else {
+      sscanf(buffertC, "%d\t%d\t%f\t%d\t%d",&f_field,&f_fpbidx,&fluence,&vox_an,&vox_an2);
+    }
+    if(isAngelica) {
+      //Angelica counts the fields from 0 and gives the fluences in units of 1e8
+      fluence*= 1e8;
+      f_field += 1;
+    }
+
+    if(Debug == 2) cout<<"Fluences vectors: field, tmp field, size: "<<f_field<<" "<<tmpfield<<" "<<tmpfluence.size()<<endl;
+    
+    if(f_field != tmpfield) {
+      if(tmpfield != -1) field_fluences.push_back(tmpfluence);
+      tmpfluence.clear();
+      tmpfield = f_field;
+    }
+    if(f_field>0 && f_field<8)
+      tmpfluence.push_back(fluence*Dose_Per_Fraction_scale);
+    //    if(Debug == 2)
+      cout<<"Fluence read: "<<f_fpbidx<<" "<<fluence<<" "<<Dose_Per_Fraction_scale<<endl;
+  }//close while
+
+  if(tmpfield != -1) field_fluences.push_back(tmpfluence);
+  for(int it=0; it<(int)field_fluences.size(); it++) {
+    cout<<"Read HMF::  "<<field_fluences.at(it).size()<<" for field "<<it+1<<endl;
+    pbperfield.at(it) = field_fluences.at(it).size();
+  }
+
+
+  //We loop on the number of pre-defined matrixes.
+  char DijName[200];
+  int i_fi(1);
+
+  //Initialize the Dij read params
+  int nn[3];  float hs[3];  float x0[3];   int npb;
+  float L[3];
+  float front[3]={0,0,1};
+  float up[3]   ={0,1,0};
+  float left[3] ={1,0,0};
+  int jpb,ifield,ni;
+
+  //Load the PTV mask
+  //myOpti.loadPTV_mhd(name,tok[0],plannedDose,weight/100.,DMF);
+  //  loadROI_mhd(ptv,fpath);
+
+  /*vector<float32> fmap_ptv;
+
+  string dtype;
+  size_t pos;
+  string dataFile;
+  read_mhd_header(fpath,dtype,nn,x0,L,left,up,front,dataFile,pos);
+  cout<<"sono qui"<<endl;
+  fmap_ptv.resize(1UL*nn[0]*nn[1]*nn[2]);
+  cout<<"sono qui"<<endl;
+  if(dtype=="MET_SHORT"){
+    vector<int16> map;
+    read_mhd(fpath,map,nn,x0,L,left,up,front);
+    for(size_t i=0;i<fmap_ptv.size();i++) fmap_ptv[i]=map[i];
+  } else if(dtype=="MET_INT"){
+    vector<int32> map;
+    read_mhd(fpath,map,nn,x0,L,left,up,front);
+      for(size_t i=0;i<fmap_ptv.size();i++) fmap_ptv[i]=map[i];
+  } else if(dtype=="MET_FLOAT"){
+    read_mhd(fpath,fmap_ptv,nn,x0,L,left,up,front);
+  } else {
+    cerr<<"Error: data type "<<dtype<<" for "<<fpath<<" not yet supported"<<endl;
+    exit(1);
+  } 
+  */
+  // for(size_t i=0;i<ROI.size();i++) ROInew[i] = ROI[i]>0? 0 : 1;
+  // write_mhd("aaa.mhd",ROInew,nn,x0,L,l,u,f);    
+
+  int N;
+  vector<int> Vi;   vector<float>di;
+
+  map< int,vector<float> > DoseMap;
+  map< int,vector<int> > PenbMap;
+  std::map<int, vector<float> >::iterator itD;
+  
+  vector<float> tmpVecD;
+  vector<int> tmpVecP;
+  float t_flue;
+  //Define root histograms
+  //  TH1D *h_Pb = new TH1D("h_Pb","PB dist",100,0,100);
+  //  TH1D *h_Dose = new TH1D("h_Dose","Dose dist",100,0,1.e-10);
+  TH1D *h_Pb = new TH1D("h_Pb","PB dist",500,0,1500);
+  TH1D *h_Dose = new TH1D("h_Dose","Dose dist",1000,0,10.);
+  TH1D *h_DoseRate = new TH1D("h_DoseRate","Dose rate dist",10000,0,1.e7);
+
+  TH1D *h_PbOne = new TH1D("h_PbOne","PB dist if 1 PB 1 field",100,0,100);
+  TH1D *h_DoseOne = new TH1D("h_DoseOne","Dose dist if 1 PB 1 field",1000,0,1.e-10);
+  TH1D *h_TimeOne = new TH1D("h_TimeOne","Time dist if 1 PB 1 field",1000,0,1.e-5);
+
+  TH1D *h_Field = new TH1D("h_Field","Fields contributing to doserate map ",10,0,10);
+
+  //  vector<vector<float> > Dose (npb, vector<float>(N, 0.));
+  //loop on the sotred spots
+  int FieldUS;
+  vector<float> mapA;
+  vector<float> mapField;    
+  vector<float> mapA_dmf;    
+  vector<float> mapA_dmf_drate;    
+  vector<float> mapA_dmf_drate_dtot;   
+  vector<float> mapA_drate[nfields];   
+  vector<float> mapA_dose_threshold[nfields];   
+  vector<float> mapA_dose_dmf_drate[nfields];   
+  vector<float> mapA_time;
+
+  float dmax_vxl = -1.;
+
+  for(i_fi = 1; i_fi<nfields+1; i_fi++) {
+
+    Vi.clear(); di.clear();
+    tmpVecD.clear(); tmpVecP.clear();
+    
+    sprintf(DijName,"%s/E%d/field%d/out/Dijaaaa.bin",dijpath.data(),fieldEnergies[i_fi-1],i_fi);
+    ifstream fin(DijName,ios::in|ios::binary);
+    if(!fin){cerr<<"Error: cannot open "<<DijName<<" in "<<dijpath.data()<<" for input"<<endl;exit(1);}
+    else {cout<<" Opening "<<DijName<<endl;}
+    
+
+    //Read the first line of Dij
+    fin.read((char *)nn,3*sizeof(int));
+    fin.read((char *)hs,3*sizeof(float));
+    fin.read((char *)x0,3*sizeof(float));
+    fin.read((char *)&npb,1*sizeof(int));
+
+    for(int i=0;i<3;i++) {
+      L[i]=hs[i]*nn[i];
+      L[i]*=10;
+      x0[i]*=10;
+    }
+    
+    N = nn[0]*nn[1]*nn[2];
+    mapField.assign(N, 0.0);
+    cout<<"Num of spots: "<<npb<<endl;
+    if(i_fi == 1) {
+      mapA.assign(N, 0.0);
+    }
+    
+    for(int j=0;j<npb;j++){
+      
+      cout<<"Scanning the PB n:: "<<j<<endl;
+      
+      // read which PB, which field, how many voxels 
+      fin.read((char *)&jpb,sizeof(int));
+      if(!fin){cerr<<"IO Error at line __LINE__"<<endl;exit(1);}
+      fin.read((char *)&ifield,sizeof(int));
+      if(!fin){cerr<<"IO Error at line __LINE__"<<endl;exit(1);}
+      fin.read((char *)&ni,sizeof(int));
+      if(!fin){cerr<<"IO Error at line __LINE__"<<endl;exit(1);}
+      
+      //reads voxels and di
+      Vi.resize(ni);
+      di.resize(ni);
+      if(Debug ==2) cout<<"PB, Field, n voxels: \t"<<jpb<<' '<<ifield<<" : "<<ni<<endl;
+      
+      if(!j) FieldUS = ifield;
+      
+      if(ni>0){
+	fin.read((char *)Vi.data(),ni*sizeof(int)  );
+	if(!fin){cerr<<"IO Error at line __LINE__"<<endl;exit(1);}
+	fin.read((char *)di.data(),ni*sizeof(float));
+	if(!fin){cerr<<"IO Error at line __LINE__"<<endl;exit(1);}
+      }
+
+      tmpfluence = field_fluences.at(FieldUS-1);
+
+      if(Debug ==2)
+	cout<<"flue "<<FieldUS<<" "<<jpb<<" "<<tmpfluence.size()<<endl;
+
+      if(jpb < (int)tmpfluence.size()) {
+	if(Debug ==2) cout<<"Field under study:  "<<FieldUS<<" PB: "<<jpb<<" fluence: "<<tmpfluence.at(jpb)<<endl;
+	t_flue = tmpfluence.at(jpb);
+      } else{
+	cout<<" ERROR:: Asking for PB:: "<<jpb<<" but we have stored only "<<tmpfluence.size()<<" values "<<endl;
+	t_flue = 0;
+      }
+      cout<<" NI "<<ni<<endl;
+      //Define the maps, per voxel, of PB giving contributions and relative dose.
+      for(size_t i=0;i<ni;i++){
+
+	if(di[i]>dmax_vxl){
+	  dmax_vxl = di[i];
+	}
+	mapA.at(Vi[i]) += t_flue*di[i]; // fill with dose, scaling with optimised fluence: sum for each pb and field!
+	mapField.at(Vi[i])+=t_flue*di[i]; // fill with dose, scaling with optimised fluence: sum for each pb!!
+	
+	if(doDRstudy) {
+	  itD = DoseMap.find(Vi[i]);
+	  
+	  //Fill the maps only if the dose is over threshold
+	  if(di[i]>threshold) {
+
+	    //	    cout<<di[i]<<" "<<threshold<<" "<<t_flue<<endl;
+	    //	    mapA.at(Vi[i]) += t_flue*di[i]; // fill with dose, scaling with optimised fluence: sum for each pb and field!
+	    
+	    if(itD == DoseMap.end()) {
+	      
+	      if(Debug==2)  cout<<" First Time I see that voxel:: "<<i<<" "<<Vi[i]<<" "<<di[i]<<endl;
+	      
+	      //Stores the dose per voxel
+	      tmpVecD.clear();
+	      tmpVecD.push_back(t_flue*di[i]);
+	      //Stores the pb that is contributing
+	      tmpVecP.clear();
+	      tmpVecP.push_back(j+1000*(FieldUS-1));
+	      //Fills the maps
+	      DoseMap.insert(pair<int, vector<float> > (Vi[i],tmpVecD) );
+	      PenbMap.insert(pair<int, vector<int> > (Vi[i],tmpVecP) );
+	      
+	    } else {
+	      if(Debug==2) 	  cout<<" Voxel already seen:: "<<i<<" "<<Vi[i]<<" "<<t_flue*di[i]<<endl;
+	      tmpVecD = DoseMap.find(Vi[i])->second;
+	      tmpVecP = PenbMap.find(Vi[i])->second;
+	      if(Debug==2) 	  cout<<" Vec sizes before "<<tmpVecD.size()<<" "<<tmpVecP.size()<<endl;
+	      tmpVecD.push_back(t_flue*di[i]);
+	      DoseMap[ Vi[i] ] = tmpVecD;
+	      tmpVecP.push_back(j+1000*(FieldUS-1));
+	      PenbMap[ Vi[i] ] = tmpVecP;
+	    }
+	  }else{
+	    tmpVecD.push_back(0.);
+
+	  }//close di > threshold
+	}
+	
+	Vi.clear();
+	di.clear();
+      }//close loop on n vxl
+      string Dosename_1 = outFlag + "DoseWithFluences"+std::to_string(i_fi)+".mhd";
+      write_mhd(Dosename_1,mapField,nn,x0,L,left,up,front);
+      //mapField.clear();
+    }//close loop on npb
+
+    
+  }//close loop on nfields
+
+  cout<<"On all VXLs, PBs and FIELDs: dmax vxl = "<<dmax_vxl<<endl;
+
+  string Dosename = outFlag + "DoseWithFluences.mhd";
+  write_mhd(Dosename,mapA,nn,x0,L,left,up,front);
+
+  mapA_dmf.assign(mapA.size(), 0.0);
+  
+  //Apply a DMF 
+  float t_dose; float fmf=1; float fmf_dtot;
+  float fmf_min = fmfMin; float d_threshold = fmfThres;
+  for(int it = 0; it<(int)mapA_dmf.size(); it++) {
+    t_dose = mapA.at(it);//t_dose here is already the total dose per vxl from the sum of each pb and field!
+    // if(t_dose>d_threshold  && (fmap_ptv.at(it) == 0 || f_OARs)) {
+     if(t_dose>d_threshold) {
+      fmf = (1-fmf_min)*(d_threshold/t_dose) + fmf_min;
+    } else {
+      fmf = 1;
+    }
+    //    mapA_dmf.at(it) += t_dose*fmf; // fill with dose, scaling with optimised fluence
+    mapA_dmf.at(it) = t_dose*fmf; // fill with dose, scaling with optimised fluence
+  }
+
+  //map with total dose per vxl from each pb and field, scaled by FMF if TOT dose per VXL > d_thr
+  Dosename = outFlag + "DoseWithFluences_DMF.mhd";
+  write_mhd(Dosename,mapA_dmf,nn,x0,L,left,up,front);
+
+  TFile *myF = new TFile(Form("myOutHistos_%s.root",outFlag.c_str()),"RECREATE");
+  mapA_dmf_drate.assign(mapA.size(), 0.0);
+  mapA_dmf_drate_dtot.assign(mapA.size(), 0.0);
+
+  for(int i_fi = 0; i_fi<nfields; i_fi++){
+    mapA_drate[i_fi].assign(mapA.size(), 0.0);
+    mapA_dose_threshold[i_fi].assign(mapA.size(), 0.0);
+    mapA_dose_dmf_drate[i_fi].assign(mapA.size(), 0.0);
+  }
+  
+  mapA_time.assign(mapA.size(), 0.0);
+
+  TTree *fdTree = new TTree("data", "data"); 
+  float f_dose, f_time;
+  fdTree->Branch("dose", &f_dose, "dose/F");
+  fdTree->Branch("time", &f_time, "time/F");
+  
+  int t_pbid(0), tmpF(-1);
+  float inst_time, t_doseTot, t_dose_rate_inst;
+  char hn[300]; TH1D* h;
+  vector < vector <float> > dose_field;
+  vector < vector <float> > dose_rate_field;
+
+  float dose_rate_threshold(drThres), timePB;
+  vector< float > d_field;
+  vector< float > d_r_field;
+
+
+  int numvxl_adr = 0;
+  int numvxl_dosetot = 0;
+  float t_dose_dmf = 0;
+  float t_dose_thr = 0;
+  float t_dose_dtot = 0;
+  vector < vector <float> > dose_field_dmf;
+  vector < vector <float> > dose_field_dtot;
+  vector < vector <float> > dose_threshold;
+
+  if(doDRstudy) {
+    /*
+    //Fast loop on all the dose
+    for ( const auto &pD : DoseMap )
+      {
+	//pD.second returns the array for each voxel and the corresponding dose.
+	for(int ip=0; ip<pD.second.size(); ip++) {
+	  h_DoseTot->Fill(pD.second.at(ip));
+	  //	cout<<"Pb giving contrib:: "<<p.second.at(ip)<<" "<<tmpfluence.at(t_pbid)<<endl;
+	}
+      } 
+    */
+    
+    for ( const auto &p : PenbMap ) {
+      
+      //How many PB in this field are contributing to this voxel
+      h_Pb->Fill(p.second.size());
+      
+      int mykey = p.first;
+      
+      vector<float> myDose = DoseMap[mykey];
+      vector<int>   myPbs  = PenbMap[mykey];
+      t_doseTot = 0;
+      for(int ip=0; ip<(int)myPbs.size(); ip++) {
+	  t_doseTot += myDose.at(ip);
+      }
+      h_Dose->Fill(t_doseTot);
+
+      d_field.clear();
+      d_r_field.clear();
+
+      dose_field.assign(nfields,d_field);
+      dose_field_dmf.assign(nfields,d_field);
+      dose_field_dtot.assign(nfields,d_field);
+      dose_threshold.assign(nfields,d_field);
+      dose_rate_field.assign(nfields,d_r_field);
+
+      //      if(t_doseTot>d_threshold  && fmap_ptv.at(mykey) == 0) {
+
+	if(myPbs.size()>1) {
+	  
+	  //More than 1 PB contribute to the voxel.
+	  //Do the doseratestudy
+	  //Compute the time of each PB contributing to the voxel
+	  for(int ip=0; ip<(int)myPbs.size(); ip++) {
+	    t_pbid = myPbs.at(ip);
+	    t_dose = myDose.at(ip);
+	    tmpF = 0;
+	    while((t_pbid - tmpF*1000)>=1000) {
+	      tmpF++;
+	    }
+	    if(Debug == 2) cout<<" It's field "<<tmpF<<" "<<t_pbid<<" "<<t_dose<<endl;
+
+	    dose_field.at(tmpF).push_back(t_dose);
+	    dose_field_dmf.at(tmpF).push_back(t_dose);
+	    dose_field_dtot.at(tmpF).push_back(t_dose);
+	    dose_threshold.at(tmpF).push_back(t_dose);
+	    timePB = getTime(tmpF,t_pbid-tmpF*1000);
+	    dose_rate_field.at(tmpF).push_back(timePB);	    
+	  }//close loop on mypbs size
+
+	  //Loop on all separate fields and see if the flash condition is met
+	  for(int iTf = 0; iTf<nfields; iTf++) {
+	    
+	    if(dose_field.at(iTf).size() == 1) {
+
+	      t_dose = dose_field.at(iTf).at(0);
+	      inst_time = pulsetime;
+
+	      
+	      t_dose_rate_inst = t_dose/inst_time;
+	      
+	      if(t_dose_rate_inst<20000 && t_dose>0.01) mapA_drate[iTf].at(mykey) = t_dose_rate_inst;
+	      
+	      mapA_time.at(mykey) += inst_time;
+
+	      h_PbOne->Fill(p.second.size());
+	      h_DoseOne->Fill(t_dose);
+	      h_TimeOne->Fill(inst_time);
+
+	      
+	      fmf = 1;
+	      fmf_dtot = 1;
+	      f_dose = t_dose;
+	      f_time = inst_time;
+	      fdTree->Fill();
+	      h_DoseRate->Fill(t_dose_rate_inst);
+	      //if(t_dose_rate_inst > dose_rate_threshold && fmap_ptv.at(mykey) == 0) {
+	      if(t_dose_rate_inst > dose_rate_threshold) {	
+		numvxl_adr++;
+		if(t_dose>d_threshold) {
+		  numvxl_dosetot++;
+		  fmf = (1-fmf_min)*(d_threshold/t_dose) + fmf_min;
+
+		} else {
+		  fmf = 1;
+		  cout<<" This should not happen!"<<endl;
+		}
+
+		if(t_doseTot>d_threshold) {
+		  fmf_dtot = (1-fmf_min)*(d_threshold/t_doseTot) + fmf_min;
+		} else {
+		  fmf_dtot = 1;
+		  cout<<" This should not happen!"<<endl;
+		}
+
+	      }
+
+	      dose_field.at(iTf).at(0) = t_dose*fmf;
+	      dose_field_dtot.at(iTf).at(0) = t_dose*fmf_dtot;
+
+	      if(fmf!=1.) dose_field_dmf.at(iTf).at(0) = t_dose*fmf;
+	      else dose_field_dmf.at(iTf).at(0) = -1.;
+	      
+	      if(t_dose<d_threshold) dose_threshold.at(iTf).at(0) = -1;
+	      
+	    }//close if dose field = 1 pb
+	    else {
+
+	      //At least 2 PB are contributing to a single field
+	      float d_max(0);
+	      //	      float t_max(0), t_min(0);
+	      bool found_10, found_90;
+	      float t_10, t_90, d_current, d_10, d_90;
+	      //	      t_min = dose_rate_field.at(iTf).at(0);
+	      //	      t_max = dose_rate_field.at(iTf).at(dose_rate_field.at(iTf).size()-1);
+	      for(int iTpb = 0; iTpb<(int)dose_field.at(iTf).size(); iTpb++) {
+		d_max += dose_field.at(iTf).at(iTpb);
+	      }
+	      
+	      found_10 = found_90 = kFALSE; d_current = 0; t_10 = t_90 = -999.;
+	      
+	      for(int iTpb = 0; iTpb<(int)dose_field.at(iTf).size(); iTpb++) {
+		//		cout<<"VXL::iTf::iTpb = "<<mykey<<" "<<iTf<<" "<<iTpb<<endl;
+		d_current += dose_field.at(iTf).at(iTpb);
+		if(d_current> d_max*0.05 && !found_10) {t_10 = dose_rate_field.at(iTf).at(iTpb); found_10 = kTRUE; d_10  = d_current;
+		  //		  cout<<"D > Dmin --> "<<t_10<<endl;
+		}
+		if(d_current> d_max*0.95 && !found_90) {t_90 = dose_rate_field.at(iTf).at(iTpb); found_90 = kTRUE; d_90 = d_current;
+		  //		cout<<"D > Dmax --> "<<t_90<<endl;
+		}
+		//		if(t_90==t_10 && t_10!=-999.) cout<<"field = "<<iTf<<" :: PB = "<<iTpb<<" :: t_90 = "<<t_90<<" :: t_10 = "<<t_10<<endl;	       
+	      }//close loop on itpb
+	      
+	      fmf = 1;
+	      fmf_dtot = 1;
+	      if(found_10 && found_90){
+		
+		t_dose_rate_inst = (d_90-d_10)/(t_90-t_10);
+
+		if((t_90-t_10)!=0. && t_90 > t_10 && t_10 != -999){
+		  if(t_dose_rate_inst<20000) mapA_drate[iTf].at(mykey) = t_dose_rate_inst;
+		}
+		//		else{
+		//		  cout<<"IN MAP---> t90-t10 = "<<(t_90-t_10)<<" t90 = "<<t_90<<" ; t10 = "<<t_10<<endl;
+		//		}
+		
+		mapA_time.at(mykey) += (t_90-t_10);
+
+
+		f_dose = d_90-d_10;
+		f_time = t_90-t_10;
+		fdTree->Fill();
+		
+		h_DoseRate->Fill(t_dose_rate_inst);
+		//if(t_dose_rate_inst> dose_rate_threshold && fmap_ptv.at(mykey) == 0) {
+		if(t_dose_rate_inst> dose_rate_threshold) {
+		  numvxl_adr++;				
+		  if(d_current>d_threshold) {
+		    numvxl_dosetot++;
+		    fmf = (1-fmf_min)*(d_threshold/d_current) + fmf_min;
+
+		  } else {
+		    fmf = 1;
+		    cout<<" This should not happen!"<<endl;
+		  }
+		  
+		  if(t_doseTot>d_threshold) {
+		    fmf_dtot = (1-fmf_min)*(d_threshold/t_doseTot) + fmf_min;
+		  } else {
+		    fmf_dtot = 1;
+		    cout<<" This should not happen!"<<endl;
+		  }
+	  
+		}
+
+	      }
+
+	      for(int iTpb = 0; iTpb<(int)dose_field.at(iTf).size(); iTpb++) {
+
+		dose_field.at(iTf).at(iTpb) = fmf*dose_field.at(iTf).at(iTpb);
+		dose_field_dtot.at(iTf).at(iTpb) = fmf_dtot*dose_field_dtot.at(iTf).at(iTpb);
+
+		if(fmf!=1.) dose_field_dmf.at(iTf).at(iTpb) = fmf*dose_field.at(iTf).at(iTpb);	       
+		else dose_field_dmf.at(iTf).at(iTpb) = -1.;
+
+		if(d_current<d_threshold) dose_threshold.at(iTf).at(iTpb) = -1;
+
+	      } 
+	    }//close else (more than 1 PB from single field)
+	    
+	  }//close loop on nfields
+
+	  //Once the dose of each PB & field has been updated, RECOMPUTE the total dose.
+	  t_dose = 0;
+	  t_dose_dmf = 0;
+	  t_dose_thr = 0;
+	  t_dose_dtot = 0;
+	  for(int iTf = 0; iTf<nfields; iTf++) {
+
+	    t_dose_dmf = 0;
+	    t_dose_thr = 0;
+
+	    for(int iTpb = 0; iTpb<(int)dose_field.at(iTf).size(); iTpb++) {
+	      t_dose += dose_field.at(iTf).at(iTpb);
+	      t_dose_dtot += dose_field_dtot.at(iTf).at(iTpb);
+	      
+	      if(dose_field_dmf.at(iTf).at(iTpb)!=-1) t_dose_dmf += dose_field_dmf.at(iTf).at(iTpb);
+	      if(dose_threshold.at(iTf).at(iTpb)!=-1) t_dose_thr += dose_threshold.at(iTf).at(iTpb);
+	    }//close loop on pbs
+
+	    mapA_dose_dmf_drate[iTf].at(mykey) = t_dose_dmf;	  
+	    mapA_dose_threshold[iTf].at(mykey) = t_dose_thr;	  
+
+	  }//close loop on fields
+
+	  mapA_dmf_drate.at(mykey) = t_dose;	  
+	  mapA_dmf_drate_dtot.at(mykey) = t_dose_dtot;	  
+
+	  //Converting N into time
+	  //We assume that 2 µs are needed to deliver 35 µC
+	  //	    inst_time = aflu*(0.000002/2.18e+14);
+	  //	  inst_time = 0.000002;
+	  
+	  
+	  
+	}//close if mypbs size > 1
+	else if(myPbs.size() == 1) {
+	  
+	  //Single PB giving contribution
+	  //Check on inst rate
+	  t_dose = myDose.at(0);
+	  t_pbid = myPbs.at(0);
+	  inst_time = pulsetime;
+
+	  //	  cout<<"sono qui  "<<t_dose<<" "<<inst_time<<endl;
+
+	  t_dose_rate_inst = t_dose/inst_time;
+
+	  f_dose = t_dose;
+	  f_time = inst_time;
+	  fdTree->Fill();
+
+	  h_DoseRate->Fill(t_dose_rate_inst);
+	  h_DoseOne->Fill(t_dose);
+	  h_TimeOne->Fill(inst_time);
+
+	  tmpF = (int)t_pbid / 1000;	  
+	  if(t_dose_rate_inst<20000) mapA_drate[tmpF].at(mykey) = t_dose_rate_inst;
+
+	  mapA_time.at(mykey) += inst_time;
+	  
+	  fmf = 1;
+	  fmf_dtot = 1;
+	  //if(t_dose_rate_inst> dose_rate_threshold && fmap_ptv.at(mykey) == 0) {
+	  if(t_dose_rate_inst> dose_rate_threshold) {
+	    numvxl_adr++;
+	    if(t_dose>d_threshold) {
+	      numvxl_dosetot++;
+	      fmf = (1-fmf_min)*(d_threshold/t_dose) + fmf_min;
+	    } else {
+	      fmf = 1;
+	      cout<<" This should not happen!"<<endl;
+	    }
+
+	    if(t_doseTot>d_threshold) {
+	      fmf_dtot = (1-fmf_min)*(d_threshold/t_doseTot) + fmf_min;
+	    } else {
+	      fmf_dtot = 1;
+	      cout<<" This should not happen!"<<endl;
+	    }
+
+	  }
+	  
+	  mapA_dmf_drate.at(mykey) = t_dose*fmf;
+	  mapA_dmf_drate_dtot.at(mykey) = t_dose*fmf_dtot;
+
+	  if(t_dose<d_threshold) mapA_dose_threshold[tmpF].at(mykey) = -1;
+	  
+	  if(fmf!=1) mapA_dose_dmf_drate[tmpF].at(mykey) = t_dose*fmf;
+	  else if(fmf==1) mapA_dose_dmf_drate[tmpF].at(mykey) = -1;
+
+
+	}//close if mypbs size = 1
+
+	
+	//satisfy the dose threshold in vxl condition & !PTV
+	/*
+      }else {
+	mapA_dmf_drate.at(mykey) = t_doseTot;
+      }
+	*/
+      
+    }//close loop on vxls
+
+    cout<<"I'M OUT OF VXL LOOP!"<<endl;
+    cout<<"VXLS with ADR > ADRth = "<<numvxl_adr<<" && with DOSE > DOSEthr "<<numvxl_dosetot<<endl;
+    
+    Dosename = outFlag + "DoseWithFluences_DMF_doserate.mhd";
+    write_mhd(Dosename,mapA_dmf_drate,nn,x0,L,left,up,front);
+
+    Dosename = outFlag + "DoseWithFluences_DMF_doserate_dtot.mhd";
+    write_mhd(Dosename,mapA_dmf_drate_dtot,nn,x0,L,left,up,front);      
+
+    char namedose[200];
+    char nameflag[(int)outFlag.length()+1];
+    strcpy(nameflag, outFlag.c_str());
+    for(i_fi = 1; i_fi<nfields+1; i_fi++){    
+      sprintf(namedose,"%sDoseRateMap_%d.mhd",nameflag,i_fi);
+      write_mhd(namedose,mapA_drate[i_fi-1],nn,x0,L,left,up,front);      
+
+      sprintf(namedose,"%sDoseMap_DMF_ADR_%d.mhd",nameflag,i_fi);
+      write_mhd(namedose,mapA_dose_dmf_drate[i_fi-1],nn,x0,L,left,up,front);      
+
+      sprintf(namedose,"%sDoseMap_thr_%d.mhd",nameflag,i_fi);
+      write_mhd(namedose,mapA_dose_threshold[i_fi-1],nn,x0,L,left,up,front);      
+    }
+    
+    Dosename = outFlag + "TimeMap.mhd";
+    write_mhd(Dosename,mapA_time,nn,x0,L,left,up,front);
+
+    
+    TCanvas *c1 = new TCanvas("c1","",900,900);
+    c1->cd();
+    h_Pb->Draw();
+    h_Pb->Write();
+    c1->Print("Dist.pdf");
+    c1->Clear();
+    h_Dose->Draw();
+    h_Dose->Write();
+    c1->Print("DoseDist.pdf");
+    h_DoseRate->Write();
+    h_PbOne->Write();
+    h_DoseOne->Write();
+    h_TimeOne->Write();
+    myF->Write();
+    myF->Close();
+  }
+
+  return 0;
+}
+
+double getTime(int fi, int pb) {
+
+  //pbperfield are known
+  float elap_time = 1./prf;
+  float t_time = pb*elap_time;
+  for(int ifi = 0; ifi< fi; ifi++)
+    {
+      t_time += pbperfield.at(ifi)*elap_time + interfield;
+    }
+
+  return t_time;
+}
+
+vector<string>	readLines(const string &fname, bool skipEmpty, bool trimLeft, bool stripComments)
+{
+	vector<string> lines;
+	ifstream fin(fname);
+	if(!fin){
+		cerr<<"Error: could not open and load file: "<<fname<<endl;
+		return lines;
+	}
+	char line[4096+1]; // 4 KB buffer
+	while (fin.good()&& !fin.eof()) {
+		fin.getline(line,4096);
+		if(skipEmpty && emptyline(line)) continue; // skip empty lines (whitespaces only)
+		if(trimLeft) ltrim(line);
+		if(stripComments && isComment(line,strtokens("/ % #"))) continue; // strip out comments
+		lines.push_back(string(line));
+	}
+	return lines;
+}
+
+
+
+
+vector<string> strtokens(const string &str,const char *sep){
+	char * tmp = new char[str.size()+1];
+	strcpy(tmp, str.c_str());
+	vector<string> tokens;
+	char *tok = strtok(tmp,sep);
+	while(tok != NULL){
+		tokens.push_back(string(tok));
+		tok = strtok(NULL,sep);
+	}
+	delete[] tmp;
+	return tokens;
+}
+
+bool isComment(string s,const vector<string> &comments){
+	if(comments.empty()) return false;
+	ltrim(s);
+	for(int k=0;k<comments.size();k++) {
+		if(s.compare(0,comments[k].length(),comments[k])==0) return true;
+	}
+	return false;
+}
+
+bool emptyline(const char *s){
+	if (s==NULL || *s=='\0') return true;
+	for (const char *p=s; *p; p++) {
+		if (!isspace(*p)) return false;
+	}
+	return true;
+}
+
+bool emptyline(const string &s){
+	return emptyline(s.c_str());
+}
+
+void ltrim(char *s){
+	if (s==NULL || *s=='\0') return;
+	char *p=s;
+	for (; *p && isspace(*p) ; p++); // skip leading spaces
+	for (; *p; p++) *(s++)=*p; // copy the remainder
+	*s=0; // terminate string
+}
+
+void ltrim(string &s){
+	char *str = new char[s.size()+1];
+	strcpy(str,s.c_str());
+	ltrim(str);
+	s=string(str);
+	delete [] str;
+}
+
+
+string ltrim(const string &s){string a = s; ltrim(a); return a;}
+
+int getIntParam(vector<string> args,string name,int & val,int def)
+{
+	int ierr = getIntParamRequired(args,name,val);
+	if(ierr==1) { val=def; return 0;}
+	return ierr;
+}
+
+int getFloatParam(vector<string> args,string name,float & val,float def)
+{
+	int ierr = getFloatParamRequired(args,name,val);
+	if(ierr==1) { val=def; return 0;}
+	return ierr;
+}
+
+int getIntParamRequired(vector<string> args,string name,int & val)
+{
+	lastParsedParameter = name;
+	for(int i=0;i<args.size();i++){
+	  if(args[i]==name){
+	    if(i==args.size()-1) return -1; // missing value
+	    long lval;
+	    lastParsedDefinition = args[i+1];
+	    if(not isInteger(args[i+1],&lval)) return -2; // wrong syntax
+	    val = lval; // type conversion
+	    return 0;
+	  }
+	}
+	return 1; // not found
+}
+
+int getFloatParamRequired(vector<string> args,string name,float & val)
+{
+  lastParsedParameter = name;
+  for(int i=0;i<args.size();i++){
+    if(args[i]==name){
+      if(i==args.size()-1) return -1; // missing value
+      lastParsedDefinition = args[i+1];
+      double dval;
+      if(not isNumeric(args[i+1],&dval)) return -2; // wrong syntax
+      val = dval; // type conversion
+      return 0;
+    }
+  }
+  return 1; // not found
+}
+
+
+bool isInteger(const string &str, long *val){
+	long v;
+	size_t idx;
+	try{
+		v = stol(str,&idx);
+	}
+	catch (const std::invalid_argument& ia) {
+	// std::cerr << "Invalid argument: " << ia.what() << '\n';
+		return false;
+	}	
+	catch (const std::out_of_range& oor) {
+	// std::cerr << "Out of Range error: " << oor.what() << '\n';
+		return false;
+	}
+	if(idx != str.size()) return false; // extra characters are present!
+	if(val) *val = v;
+	return true;
+}
+
+bool isNumeric(const string &str, double *val){
+	double v;
+	size_t idx;	
+	try{
+		v = stod(str,&idx);
+	}
+
+	catch (const std::invalid_argument& ia) {
+	// std::cerr << "Invalid argument: " << ia.what() << '\n';
+		return false;
+	}	
+	catch (const std::out_of_range& oor) {
+	// std::cerr << "Out of Range error: " << oor.what() << '\n';
+		return false;
+	}	
+	if(idx != str.size()) return false; // extra characters are present!
+	if(val) *val = v;
+	return true;
+}
+

@@ -1,0 +1,10 @@
+default: compile link
+
+
+compile:
+#	rm *.o
+	$(FLUPRO)/flutil/fff  source_beam.f
+
+link:
+	$(FLUPRO)/flutil/ldpmqmd SAFEST_PIN.o -o SAFEST_PIN.exe
+

@@ -1,0 +1,39 @@
+TITLE
+electron on a 10cmx10cmx1cm box filled with Water  (Gaia 2020)
+DEFAULTS                                                              PRECISIO
+THRESHOL
+BEAM          -0.001                           0.0       0.0          PHOTON
+BEAMPOS          0.0       0.0       -2.
+EMF
+EMFCUT        -1E-05      1E-5             BLKBODY  @LASTREG        1.
+EMFCUT        -1E-05      1E-5        1.      PMMA      PMMA        1.PROD-CUT
+DELTARAY        5E-5                          PMMA      PMMA          PRINT
+*EMFRAY            6.   BLKBODY  @LASTREG        1.
+*
+* ******************************************************************************
+*                          GEOMETRY                                            *
+* ******************************************************************************
+GEOBEGIN                                                              COMBNAME
+    0    0          
+SPH cnero      0.0 0.0 0.0 200.
+SPH vacuum     0.0 0.0 0.0 101.
+RPP phantom    -25. 25. -25. 25. 0.0 60.
+END
+BLKBODY      5 cnero-vacuum
+VUOTO        5 vacuum-phantom
+FANTO        5 phantom
+END
+GEOEND
+ASSIGNMA    BLCKHOLE   BLKBODY
+ASSIGNMA      VACUUM     VUOTO
+ASSIGNMA        PMMA     FANTO
+USRBIN           10.      DOSE      -21.       25.       25.       60.dose
+USRBIN          -25.      -25.       0.0      251.      251.       60. &
+*
+USROCALL
+RANDOMIZ          1.   593585.
+* ******************************************************************************
+*                          RUN                                                 *
+* ******************************************************************************
+START       1000000.
+STOP

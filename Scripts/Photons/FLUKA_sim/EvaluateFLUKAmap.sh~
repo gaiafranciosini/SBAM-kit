@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# ── PARTE 1: converti fort.21 → dose.mhd ──────────────────────
+for FORT_FILE in *fort.21; do
+    if [ ! -f "$FORT_FILE" ]; then
+        echo "Nessun file *fort.21 trovato."
+        break
+    fi
+
+    # Estrai il numero prima di _fort.21, poi togli le ultime 3 cifre (replica)
+    FULL_NUM=$(echo "$FORT_FILE" | sed 's/.*_cella\([0-9]*\)_fort\.21/\1/')
+    NUM=${FULL_NUM%???}
+
+    MHD_OUT="dose${NUM}.mhd"
+    echo "Converto: $FORT_FILE → $MHD_OUT"
+    bnn2mhd "$FORT_FILE" "$MHD_OUT"
+done
+
+echo "------------------------------------------------------------"
+
+# ── PARTE 2: riscala i dose*.mhd ──────────────────────────────
+for MHD_FILE in dose*.mhd; do
+    if [ ! -f "$MHD_FILE" ]; then
+        echo "Nessun file dose*.mhd trovato."
+        break
+    fi
+
+    NUM=$(echo "$MHD_FILE" | sed 's/dose\([0-9]*\)\.mhd/\1/')
+    TXT_FILE="${NUM}.txt"
+
+    echo "------------------------------------------------------------"
+    echo "Elaborazione: $MHD_FILE"
+
+    if [ ! -f "$TXT_FILE" ]; then
+        echo "  [ATTENZIONE] $TXT_FILE non trovato, salto $MHD_FILE."
+        continue
+    fi
+
+    RIGHE=$(wc -l < "$TXT_FILE")
+    echo "  $TXT_FILE ha $RIGHE righe"
+
+    echo "  Moltiplico $MHD_FILE per 1.602e-7..."
+    map_rescale.py "$MHD_FILE" -factor 1.602e-7
+    if [ $? -ne 0 ]; then
+        echo "  [ERRORE] map_rescale -factor 1.602e-7 fallito per $MHD_FILE, salto."
+        continue
+    fi
+
+    echo "  Moltiplico $MHD_FILE per $RIGHE..."
+    map_rescale.py "$MHD_FILE" -factor "$RIGHE"
+    if [ $? -ne 0 ]; then
+        echo "  [ERRORE] map_rescale -factor RIGHE fallito per $MHD_FILE, salto."
+        continue
+    fi
+
+    echo "  Moltiplico $MHD_FILE per 3562500..."
+    map_rescale.py "$MHD_FILE" -factor 3562500
+    if [ $? -ne 0 ]; then
+        echo "  [ERRORE] map_rescale -factor 3562500 fallito per $MHD_FILE, salto."
+        continue
+    fi
+
+    echo "  OK: $MHD_FILE elaborato."
+done
+
+echo "------------------------------------------------------------"
+echo "Elaborazione completata."
