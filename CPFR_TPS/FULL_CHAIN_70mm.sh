@@ -781,13 +781,25 @@ cp sim${E}MeV/EF70mm${E}MeV.inp files/
 
 i=1
 while [ -d "AUTO_sim${E}MeV_$i" ]; do
-  ((i++))
+    ((i++))
 done
 mv "sim${E}MeV" "AUTO_sim${E}MeV_$i"
-rm -f "AUTO_sim${E}MeV_$i/*PADDED_deSH.mhd"
-rm -f  "AUTO_sim${E}MeV_$i/*PADDED.mhd"
-rm -f "AUTO_sim${E}MeV_$i/*PADDED_deSH.raw"
-rm -f "AUTO_sim${E}MeV_$i/*PADDED.raw"
+rm -f "AUTO_sim${E}MeV_$i"/*PADDED_deSH.mhd
+rm -f  "AUTO_sim${E}MeV_$i"/*PADDED.mhd
+rm -f "AUTO_sim${E}MeV_$i"/*PADDED_deSH.raw
+rm -f "AUTO_sim${E}MeV_$i"/*PADDED.raw
+rm -f "AUTO_sim${E}MeV_$i"/*fort.23
+rm -f "AUTO_sim${E}MeV_$i"/*fort.19
+rm -f "AUTO_sim${E}MeV_$i"/*.log
+rm -f "AUTO_sim${E}MeV_$i"/*R00$i.out
+rm -f "AUTO_sim${E}MeV_$i"/DOSE_${E}MeV_1pulses_CONV.mhd
+rm -f "AUTO_sim${E}MeV_$i"/DOSE_${E}MeV_1pulses_FLASH.mhd
+rm -f "AUTO_sim${E}MeV_$i"/DOSE_${E}MeV_GRID.mhd
+rm -f "AUTO_sim${E}MeV_$i"/DOSE_${E}MeV_orig.mhd
+rm -f "AUTO_sim${E}MeV_$i"/DOSE_${E}MeV_CONV.mhd
+rm -f "AUTO_sim${E}MeV_$i"/DOSE_${E}MeV_FLASH.mhd
+rm -f "AUTO_sim${E}MeV_$i"/dose_tot*.mhd
+rm -f "AUTO_sim${E}MeV_$i"/avg.mhd
 done
 
 echo "Enjoy! Premi ctrl+c per uscire"

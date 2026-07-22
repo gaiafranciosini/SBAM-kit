@@ -201,16 +201,26 @@ def main() -> None:
 
     plotted = 0
     errors: List[str] = []
-    xmax=0
-    for fpath in files:
+    xmax = 0
+    # 1) ho aggiunto questo per la modifica dei colori : curve_colors = plt.cm.tab20(np.linspace(0, 1, len(files)))
+    curve_colors = plt.cm.tab20(np.linspace(0, 1, len(files)))
+    # 2) ho messo for i, fpath in enumerate(files) prima era for fpath in files
+    for i, fpath in enumerate(files):
         try:
             x, y = read_dvh_txt(fpath)
-            mask=y > 0.001
-            if (max(x[mask])>xmax):
-              xmax = max(x[mask])
-              print(xmax)
+            mask = y > 0.001
+            if (max(x[mask]) > xmax):
+                xmax = max(x[mask])
+                print(xmax)
             label = make_label(fpath, args.label_mode)
-            ax.plot(x[mask], y[mask], linewidth=2.0, label=label)
+            # 3)           ax.plot(x[mask], y[mask], linewidth=2.0, label=label) sostituito con ax.plot(
+            #   x[mask],
+            #   y[mask],
+            #   linewidth=2.0,
+            #   label=label,
+            #   color=curve_colors[i]
+            # )
+            ax.plot(x[mask], y[mask], linewidth=2.0, label=label, color=curve_colors[i])
             plotted += 1
         except Exception as e:
             errors.append(f"{fpath}: {e}")
@@ -223,7 +233,7 @@ def main() -> None:
     ax.set_title(args.title, fontsize=18, pad=12)
     ax.set_xlabel(xlabel, fontsize=15, labelpad=10)
     ax.set_ylabel(ylabel, fontsize=15, labelpad=10)
-    ax.set_xlim(0, 1.01*xmax)
+    ax.set_xlim(0, 1.01 * xmax)
     ax.tick_params(axis="both", which="major", labelsize=13)
     ax.grid(True, which="both", alpha=0.25)
 

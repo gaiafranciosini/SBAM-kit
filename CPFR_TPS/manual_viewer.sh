@@ -25,13 +25,16 @@ shift 6
 # ======================================================================
 # --- ESTRAZIONE PARAMETRI GEOMETRICI (da ManualFieldSize.out) ---
 # Leggiamo i valori numerici dalle righe 3, 4, 5 e 6
-TOP=$(sed -n '3p' "$INPUT_MANUAL" | awk '{print $2}')
-BOTTOM=$(sed -n '4p' "$INPUT_MANUAL" | awk '{print $2}')
-LEFT=$(sed -n '5p' "$INPUT_MANUAL" | awk '{print $2}')
-RIGHT=$(sed -n '6p' "$INPUT_MANUAL" | awk '{print $2}')
+# --- ESTRAZIONE PARAMETRI GEOMETRICI DINAMICA ---
+# --- ESTRAZIONE PARAMETRI GEOMETRICI DINAMICA ---
+TOP=$(grep -i "TOP" "$INPUT_MANUAL" | head -n 1 | awk '{print $2}' | tr -d '\r')
+BOTTOM=$(grep -i "BOTTOM" "$INPUT_MANUAL" | head -n 1 | awk '{print $2}' | tr -d '\r')
+LEFT=$(grep -i "LEFT" "$INPUT_MANUAL" | head -n 1 | awk '{print $2}' | tr -d '\r')
+RIGHT=$(grep -i "RIGHT" "$INPUT_MANUAL" | head -n 1 | awk '{print $2}' | tr -d '\r')
 
-# Costruiamo il suffisso per le cartelle (es: _L 3.0_R 3.0_T 2.0_B 2.0_cm)
+# Costruiamo il suffisso per le cartelle
 SUFFIX_DIR="_L${LEFT}_R${RIGHT}_T${TOP}_B${BOTTOM}_cm_${sim}"
+
 # ======================================================================
 
 # --- LETTURA ENERGIE TRAMITE GREP (da setup.out) ---

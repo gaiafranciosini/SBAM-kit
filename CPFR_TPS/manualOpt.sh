@@ -435,7 +435,14 @@ echo "L R T B = left right top bottom slit aperture in cm (ID: ${FIELD_ID})"
 rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.mhd
 rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.mhd
 rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.raw
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.raw
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.rawi=1
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_1pulses_CONV.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_1pulses_FLASH.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_CONV.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_FLASH.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_GRID.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_orig.mhd
+rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/dose_tot*.mhd
 done
 
 echo "Enjoy! Premere ctrl+c per uscire"
