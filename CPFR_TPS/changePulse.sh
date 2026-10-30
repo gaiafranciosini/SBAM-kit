@@ -1,132 +1,86 @@
 #!/bin/bash
-#++++++++++++++++++++++++++++++++++
-echo "New number of pulses:"
-read new_pulses
-input="input_log.out"
-read -r file CT PTV MARKER rest < "$input"
-read -r _ roi_line < <(grep '^ROI:' "$input")
-ROIs=(${roi_line#ROI: })
+# ============================================================
+# Usage (from the main folder, where input_log.out is):
+#   ./changePulse.sh DOSE_7MeV_1048pulses_CONV_FINAL.mhd <new_pulses>
+# ============================================================
 
-# Inizializza variabili
-#ape=0
-energies=()
-pulses=1
-#preD=""
-#preV=""
-primaries=""
-available_CPUs=""
-INPs=""
-primaries_per_CPU=""
-CPUs=""
+die() { echo "Error: $*" >&2; exit 1; }
 
-# Legge il file riga per riga
-while IFS= read -r line; do
-    case "$line" in
-        "ENERGY:"*)
-            energies=(${line#ENERGY: })
-            ;;
-#        "PULSES:"*)
-#            pulses=(${line#PULSES: })
-#            ;;
-        "PERCENTAGE PRESCRIPTION DOSE:"*)
-            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
-            ;;
-        "PERCENTAGE PRESCRIPTION VOLUME:"*)
-            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
-            ;;
-        "PRIMARIES:"*)
-            primaries=${line#PRIMARIES: }
-            ;;
-        "AVAILABLE CPUs:"*)
-            available_CPUs=${line#AVAILABLE CPUs: }
-            ;;
-        "INP FILES:"*)
-            INPs=${line#INP FILES: }
-            ;;
-        "PRIMARIES PER CPU:"*)
-            primaries_per_CPU=${line#PRIMARIES PER CPU: }
-            ;;
-        "USED CPUs:"*)
-            CPUs=${line#USED CPUs: }
-            ;;
-    esac
-done < "$file"
+map=$(realpath "$1" 2>/dev/null)
+new="$2"
 
+[ -f "$map" ] && [[ "$new" =~ ^[0-9]+$ ]] \
+    || die "usage: $0 DOSE_<E>MeV_<N>pulses_CONV_FINAL.mhd <new_pulses>"
 
-#CALIBRATION FACTORS (primaries/pulse)
-kFLASH_7MeV=9.382238805934787e+11
-kCONV_7MeV=1.42155133423254e+10
-kFLASH_9MeV=7.106140035174675e+11
-kCONV_9MeV=1.07668788411738e+10
+[[ "$(basename "$map")" =~ DOSE_([0-9]+)MeV_([0-9]+)pulses ]] \
+    || die "cannot read energy/pulses from the map name."
 
+E=${BASH_REMATCH[1]}
+old=${BASH_REMATCH[2]}
 
-all_rois_path=()
-ROIs_plan=()
-for roi in "${ROIs[@]}"; do
-all_rois_path+=("../imgs/${roi}_plan.mhd")
-ROIs_plan+=("${roi}_plan")
-done 
+[ -f input_log.out ] || die "input_log.out not found (run from the main folder)."
+grep -q '^ROI:' input_log.out || die "No 'ROI:' line found in input_log.out."
 
-echo "ORIGINAL # of PULSES: ${pulses}"
-echo "NEW # of PULSES: ${new_pulses}"
+root=$PWD
+kit="$root/starter_kit"
+sim_dir=$(dirname "$map")
+out="DVH${E}MeV_${new}pulses"
 
-pids=()
-for E in "${energies[@]}"; do
-  echo "Rescaling ${E}MeV test"
-  cd sim${E}MeV
-  [[ -d DVH${E}MeV ]] && mv DVH${E}MeV DVH${E}MeV_${pulses}pulses
-  [[ -f ${E}MeV.png ]] && mv ${E}MeV.png ${E}MeV_${pulses}pulses.png
-  [[ -f DOSE_${E}MeV.mhd ]] && cp DOSE_${E}MeV.mhd DOSE_${E}MeV_${pulses}pulses.mhd
-  mkdir "DVH${E}MeV_${new_pulses}pulses"
-  
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider "${pulses}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${new_pulses}"
-  echo "Map rescaled"
-  ../starter_kit/ComputeDVH/ComputeDVH.x -Dgoal 2000 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV.mhd -type float -fileLabel ${E}MeV -dir DVH${E}MeV_${new_pulses}pulses > trash.out
-  echo "New DVH curves created"
-  python3 ../starter_kit/plotDVH.py -label1 ${E}MeV -dir1 DVH${E}MeV_${new_pulses}pulses -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_${new_pulses}pulses/PTV_plan${E}MeV.txt > DVH${E}MeV_${new_pulses}pulses/DVH_PTV.out
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier "${pulses}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider "${new_pulses}"
-  
-#  mv ${E}MeV.png ${E}MeV_${new_pulses}pulses.png
-  echo "DVH plot saved"
-  pids+=("$!")
-  cd ..
-  echo " "
-done 
+# ROIs (from input_log.out)
+read -r _ roi_line < <(grep '^ROI:' input_log.out)
+ROIs=($roi_line)
+rois_path=(); rois_plan=()
 
-ex_pulses=${pulses}
-pulses=(${ex_pulses} ${new_pulses})
-
-dirs=()
-plotname="DVH_"
-for E in "${energies[@]}"; do
-plotname+="${E}_"
-done
-plotname+="MeV_"
-for P in "${pulses[@]}"; do
-plotname+="${P}_"
-done
-plotname+="pulses.png"
-
-for E in "${energies[@]}"; do
-for P in "${pulses[@]}"; do
-dirs+=("sim${E}MeV/DVH${E}MeV_${P}pulses")
-done
+for r in "${ROIs[@]}"; do
+    # Evita di duplicare PTV se è già presente in input_log.out
+    if [ "$r" != "PTV" ]; then
+        rois_path+=("${root}/imgs/${r}_plan.mhd")
+        rois_plan+=("${r}_plan")
+    fi
 done
 
-python3 starter_kit/GetDVHPlot.py "${dirs[@]}" --out "./${plotname}"
-echo "${plotname} generated"
-echo "To compare DVHs with other energies or pulses values use:" 
-echo "bash newDVHplot.sh"
+echo "Original pulses: ${old} | new pulses: ${new} | energy: ${E} MeV"
 
+cd "$sim_dir" || exit 1
+mkdir -p "$out"
 
+# Temporary copy of the map (header + data file), removed at exit
+tmp="tmp_rescale_$$"
+trap 'rm -f "${sim_dir}/${tmp}"*' EXIT
 
+cp "$map" "${tmp}.mhd"
 
+# Estrazione robusta di ElementDataFile (case-insensitive e senza spazi)
+raw=$(grep -a -i '^ElementDataFile' "$map" | sed -E 's/^[Ee]lement[Dd]ata[Ff]ile\s*=\s*//i' | tr -d '\r' | xargs)
+[ -n "$raw" ] || die "ElementDataFile key not found in $map"
 
+if [ "$raw" != "LOCAL" ]; then
+    ext="${raw##*.}"
+    data_file="$(dirname "$map")/${raw}"
+    [ -f "$data_file" ] || die "Data file ${raw} not found in $(dirname "$map")."
+    
+    cp "$data_file" "${tmp}.${ext}" || die "Failed to copy data file."
+    
+    # Compatibile sia con Linux che macOS per sed -i
+    if sed --version 2>/dev/null | grep -q GNU; then
+        sed -i "s|^[Ee]lement[Dd]ata[Ff]ile.*|ElementDataFile = ${tmp}.${ext}|i" "${tmp}.mhd"
+    else
+        sed -i '' "s|^[Ee]lement[Dd]ata[Ff]ile.*|ElementDataFile = ${tmp}.${ext}|i" "${tmp}.mhd"
+    fi
+fi
 
+# Rescale: per pulse, then times the new number of pulses
+python3 "$kit/map_rescale.py" "${tmp}.mhd" -divider "$old"    >/dev/null || die "map_rescale (divider) failed."
+python3 "$kit/map_rescale.py" "${tmp}.mhd" -multiplier "$new" >/dev/null || die "map_rescale (multiplier) failed."
+echo "Map rescaled"
 
+# DVH, plot, PTV summary
+"$kit/ComputeDVH/ComputeDVH.py" -Dgoal 5000 -roi "${root}/imgs/PTV_plan.mhd" "${rois_path[@]}" \
+    -dose "${tmp}.mhd" -type float -fileLabel "${E}MeV" -dir "$out" >/dev/null || die "ComputeDVH failed."
+echo "New DVH curves created"
 
+python3 "$kit/plotDVH.py" -label1 "${E}MeV" -dir1 "$out" -roi PTV_plan "${rois_plan[@]}" >/dev/null || die "plotDVH failed."
+python3 "$kit/readDVH.py" -DVH "${out}/PTV_plan${E}MeV.txt" -preD 22.5 > "${out}/DVH_PTV.out" || die "readDVH failed."
 
-
+[ -f "${E}MeV.png" ] && mv "${E}MeV.png" "${out}/${E}MeV_${new}pulses.png"
+echo "DVH plot saved in ${sim_dir}/${out}"

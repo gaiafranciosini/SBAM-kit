@@ -74,6 +74,9 @@ LEAF_COLORS = {
     'right':  '#FF9F00',
 }
 
+# MODIFICA: apertura massima consentita per ciascuna lamella [cm]
+MAX_LEAF_OPENING_CM = 2.500
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # GEOMETRY HELPERS
@@ -302,10 +305,11 @@ class BEVApp:
         self.rect_w = args.rect_w
         self.rect_h = args.rect_h
 
-        self.top_cm = args.top
-        self.bottom_cm = args.bottom
-        self.left_cm = args.left
-        self.right_cm = args.right
+        # MODIFICA: lock iniziale delle 4 lamelle a un massimo di 2.500 cm
+        self.top_cm = min(args.top, MAX_LEAF_OPENING_CM)
+        self.bottom_cm = min(args.bottom, MAX_LEAF_OPENING_CM)
+        self.left_cm = min(args.left, MAX_LEAF_OPENING_CM)
+        self.right_cm = min(args.right, MAX_LEAF_OPENING_CM)
 
         self.angle = args.angle
         self.output_file = args.output
@@ -597,7 +601,8 @@ class BEVApp:
         self._set_side_distance(side, value, redraw=True, save=False)
 
     def _set_side_distance(self, side, value, redraw=True, save=False):
-        value = max(0.0, float(value))
+        # MODIFICA: lock della singola lamella nell'intervallo 0.000 - 2.500 cm
+        value = min(MAX_LEAF_OPENING_CM, max(0.0, float(value)))
 
         if side == 'top':
             self.top_cm = value
@@ -948,3 +953,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

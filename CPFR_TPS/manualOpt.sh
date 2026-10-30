@@ -37,6 +37,7 @@ energies=()
 #pulses=""
 preD=""
 preV=""
+Pdose=""
 primaries=""
 available_CPUs=""
 INPs=""
@@ -45,35 +46,38 @@ CPUs=""
 
 # Legge il file riga per riga
 while IFS= read -r line; do
-    case "$line" in
-        "ENERGY:"*)
-            energies=(${line#ENERGY: })
-            ;;
+  case "$line" in
+    "ENERGY:"*)
+      energies=(${line#ENERGY: })
+      ;;
 #        "PULSES:"*)
 #            pulses=(${line#PULSES: })
 #            ;;
-        "PERCENTAGE PRESCRIPTION DOSE:"*)
-            preD=${line#PERCENTAGE PRESCRIPTION DOSE: }
-            ;;
-        "PERCENTAGE PRESCRIPTION VOLUME:"*)
-            preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
-            ;;
-        "PRIMARIES:"*)
-            primaries=${line#PRIMARIES: }
-            ;;
-        "AVAILABLE CPUs:"*)
-            available_CPUs=${line#AVAILABLE CPUs: }
-            ;;
-        "INP FILES:"*)
-            INPs=${line#INP FILES: }
-            ;;
-        "PRIMARIES PER CPU:"*)
-            primaries_per_CPU=${line#PRIMARIES PER CPU: }
-            ;;
-        "USED CPUs:"*)
-            CPUs=${line#USED CPUs: }
-            ;;
-    esac
+    "PRESCRIPTION DOSE:"*)
+      preD=${line#PRESCRIPTION DOSE: }
+      ;;
+    "PERCENTAGE PRESCRIPTION VOLUME:"*)
+      preV=${line#PERCENTAGE PRESCRIPTION VOLUME: }
+      ;;
+    "PERCENTAGE PRESCRIPTION DOSE:"*)
+      Pdose=${line#PERCENTAGE PRESCRIPTION DOSE: }
+      ;;
+    "PRIMARIES:"*)
+      primaries=${line#PRIMARIES: }
+      ;;
+    "AVAILABLE CPUs:"*)
+      available_CPUs=${line#AVAILABLE CPUs: }
+      ;;
+    "INP FILES:"*)
+      INPs=${line#INP FILES: }
+      ;;
+    "PRIMARIES PER CPU:"*)
+      primaries_per_CPU=${line#PRIMARIES PER CPU: }
+      ;;
+    "USED CPUs:"*)
+      CPUs=${line#USED CPUs: }
+      ;;
+  esac
 done < "$file"
 
 
@@ -86,8 +90,8 @@ kCONV_9MeV=1.07668788411738e+10
 for E in "${energies[@]}"; do
 
   if [ -d "sim${E}MeV" ]; then
-      rm -rf "OLD_sim${E}MeV"
-      mv sim${E}MeV OLD_sim${E}MeV
+    rm -rf "OLD_sim${E}MeV"
+    mv sim${E}MeV OLD_sim${E}MeV
   fi
 
   mkdir sim${E}MeV
@@ -100,16 +104,16 @@ done
 # Controllo esistenza file ManualFieldSize
 manual_file="ManualFieldSize_${FIELD_ID}.out"
 if [ ! -f "$manual_file" ]; then
-    echo "Errore: il file $manual_file non esiste!"
-    exit 1
+  echo "Errore: il file $manual_file non esiste!"
+  exit 1
 fi
 
 while IFS=':' read -r key value; do
-    [[ -z "$key" || -z "$value" ]] && continue
-    # Pulizia base per evitare problemi di formattazione nascosti (spazi o carriage return)
-    key=$(echo "$key" | tr -d '\r' | xargs)
-    value=$(echo "$value" | tr -d '\r' | xargs)
-    declare "${key}=${value}"
+  [[ -z "$key" || -z "$value" ]] && continue
+  # Pulizia base per evitare problemi di formattazione nascosti (spazi o carriage return)
+  key=$(echo "$key" | tr -d '\r' | xargs)
+  value=$(echo "$value" | tr -d '\r' | xargs)
+  declare "${key}=${value}"
 done < "$manual_file"
 
 # top_cm
@@ -143,17 +147,17 @@ Hs=()
 for E in "${energies[@]}"; do
 
 
-# 4. MODIFY FLUKA file - field size
+  # 4. MODIFY FLUKA file - field size
 
   python3 starter_kit/ManualGetSlitMargins.py ${width} ${height} ${FLUKA_right_cm} ${FLUKA_left_cm} ${top_cm} ${bottom_cm}  > "sim${E}MeV/aperture.out"
   read -r Xi_right Xf_right Xi_left Xf_left Yi_down Yf_down Yi_up Yf_up < <(
-  awk '/^APERTURE:/{
-    for(i=2;i<=NF;i++)
-      if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/)
-        printf "%s ", $i;
-    print ""
-  }' "sim${E}MeV/aperture.out"
-)
+    awk '/^APERTURE:/{
+      for(i=2;i<=NF;i++)
+        if($i ~ /^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$/)
+          printf "%s ", $i;
+      print ""
+    }' "sim${E}MeV/aperture.out"
+  )
 
 #  echo "$Xi_right $Xf_right $Xi_left $Xf_left $Yi_down $Yf_down $Yi_up $Yf_up"
 #  sed -i -E "s/^((RPP[[:space:]]+lam1[[:space:]])+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+[[:space:]]+-?[0-9.]+)/\1 ${Yi_up} ${Yf_up} /" sim${E}MeV/EF70mm${E}MeV.inp
@@ -203,7 +207,7 @@ for E in "${energies[@]}"; do
 
 
 
-degRot=$(echo "${rotation_angle_deg} * -1" | bc -l)
+  degRot=$(echo "${rotation_angle_deg} * -1" | bc -l)
 
   bash starter_kit/card_modifier.sh "sim${E}MeV/EF70mm${E}MeV.inp" "sim${E}MeV/tmp.inp" "ROT-DEFI" 3 "${degRot}" 2
   bash starter_kit/card_modifier.sh "sim${E}MeV/tmp.inp" "sim${E}MeV/EF70mm${E}MeV.inp" "SOURCE" 7 "${E}MeV" 1
@@ -220,11 +224,11 @@ degRot=$(echo "${rotation_angle_deg} * -1" | bc -l)
   what_pid=()
   mkdir -p logs
 
-    for run in $(seq 1 "${INPs}"); do
-        nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
-        pids+=($!)
-        what_pid+=("${E}MeV_run${run}")
-    done
+  for run in $(seq 1 "${INPs}"); do
+    nohup ${FLUPRO}/flutil/rfluka run_${run}R.inp -e fluka_EF_${E}MeV.exe -N0 -M1 > "logs/run_${run}.log" 2>&1 &
+    pids+=($!)
+    what_pid+=("${E}MeV_run${run}")
+  done
 
   printf "%s\n" "${pids[@]}" > processall.pid
   cd ..
@@ -251,8 +255,8 @@ fi
 all_rois_path=()
 ROIs_plan=()
 for roi in "${ROIs[@]}"; do
-all_rois_path+=("../imgs/${roi}_plan.mhd")
-ROIs_plan+=("${roi}_plan")
+  all_rois_path+=("../imgs/${roi}_plan.mhd")
+  ROIs_plan+=("${roi}_plan")
 done
 
 
@@ -293,7 +297,7 @@ for E in "${energies[@]}"; do
   if (( ${#check[@]} == 1 )); then
     cp "${check[0]}" dose_tot_run_copy.mhd
   fi
-  nohup python3 ../starter_kit/mhd_combine.py -avg dose_tot_run* > trash.out 2>&1 &
+  nohup python3 ../starter_kit/map_combine.py -avg dose_tot_run* > trash.out 2>&1 &
   pids+=("$!")
   cd ..
 done
@@ -320,9 +324,9 @@ for E in "${energies[@]}"; do
   ./mhd_smooth.x avg.mhd -o avg_smooth.mhd > trash.out
   mv avg_smooth.mhd DOSE_${E}MeV_GRID.mhd
 
-  python3 ../starter_kit/mhd_refill.py -ct ../imgs/CT_plan.mhd -dose DOSE_${E}MeV_GRID.mhd -out DOSE_${E}MeV.mhd
-  python3 ../starter_kit/mhd_astype.py DOSE_${E}MeV.mhd float32
-  python3 ../starter_kit/mhd_info.py -v DOSE_${E}MeV.mhd > dose_info.out
+  python3 ../starter_kit/map_refill.py -ct ../imgs/CT_plan.mhd -dose DOSE_${E}MeV_GRID.mhd -out DOSE_${E}MeV.mhd
+  python3 ../starter_kit/map_astype.py DOSE_${E}MeV.mhd float32
+  python3 ../starter_kit/map_info.py  DOSE_${E}MeV.mhd > dose_info.out
   output=$(grep "range=" dose_info.out | head -n 1)
 
   read -r min max < <(echo "$output" | awk '{
@@ -337,9 +341,9 @@ for E in "${energies[@]}"; do
     print ""
   }')
 
-#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider ${max}
-#  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier 50
-#
+  #  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -divider ${max}
+  #  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV.mhd -multiplier 50
+  #
   echo "Creating dose map and DVH for ${E}MeV"
   mkdir -p DVH${E}MeV_FLASH
   mkdir -p DVH${E}MeV_CONV
@@ -348,32 +352,32 @@ for E in "${energies[@]}"; do
 
   cp DOSE_${E}MeV.mhd DOSE_${E}MeV_FLASH.mhd
   mv DOSE_${E}MeV.mhd DOSE_${E}MeV_CONV.mhd
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${!factor_FLASH}"   # 1pulse
+  python3 ../starter_kit/map_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${!factor_FLASH}"   # 1pulse
   cp DOSE_${E}MeV_FLASH.mhd DOSE_${E}MeV_1pulses_FLASH.mhd
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${!factor_CONV}"   # 1pulse
+  python3 ../starter_kit/map_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${!factor_CONV}"   # 1pulse
   cp DOSE_${E}MeV_CONV.mhd DOSE_${E}MeV_1pulses_CONV.mhd
   ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_FLASH.mhd -type float -fileLabel ${E}MeV_FLASH -dir DVH${E}MeV_FLASH --binningDVH 10000 > trash.out
   ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_CONV.mhd -type float -fileLabel ${E}MeV_CONV -dir DVH${E}MeV_CONV --binningDVH 10000 > trash.out
-  pulses_FLASH=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt ${preD} ${preV} )
-  pulses_CONV=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt ${preD} ${preV} )
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${pulses_FLASH}"
-  python3 ../starter_kit/mhd_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${pulses_CONV}"
+  pulses_FLASH=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt ${preD} ${preV}  --preD_percent ${Pdose} )
+  pulses_CONV=$(python3 ../starter_kit/findPulses.py DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt ${preD} ${preV}  --preD_percent ${Pdose})
+  python3 ../starter_kit/map_rescale.py DOSE_${E}MeV_FLASH.mhd -multiplier "${pulses_FLASH}"
+  python3 ../starter_kit/map_rescale.py DOSE_${E}MeV_CONV.mhd -multiplier "${pulses_CONV}"
   ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_FLASH.mhd -type float -fileLabel ${E}MeV_FLASH -dir DVH${E}MeV_FLASH --binningDVH 1000  > trash.out
   ../starter_kit/ComputeDVH/ComputeDVH.py -Dgoal 1 -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -dose DOSE_${E}MeV_CONV.mhd -type float -fileLabel ${E}MeV_CONV -dir DVH${E}MeV_CONV --binningDVH 1000  > trash.out
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV_FLASH -dir1 DVH${E}MeV_FLASH -roi PTV_plan "${ROIs_plan[@]}" > trash.out
   python3 ../starter_kit/plotDVH.py -label1 ${E}MeV_CONV -dir1 DVH${E}MeV_CONV -roi PTV_plan "${ROIs_plan[@]}" > trash.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt > DVH${E}MeV_FLASH/DVH_PTV_FLASH.out
-  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt > DVH${E}MeV_CONV/DVH_PTV_CONV.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_FLASH/PTV_plan${E}MeV_FLASH.txt -preD "$preD" > DVH${E}MeV_FLASH/DVH_PTV_FLASH.out
+  python3 ../starter_kit/readDVH.py -DVH DVH${E}MeV_CONV/PTV_plan${E}MeV_CONV.txt -preD "$preD" > DVH${E}MeV_CONV/DVH_PTV_CONV.out
   cp DOSE_${E}MeV_FLASH.mhd DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd
   cp DOSE_${E}MeV_CONV.mhd DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd
   DVHdirs+=("sim${E}MeV/DVH${E}MeV_FLASH")
   DVHdirs+=("sim${E}MeV/DVH${E}MeV_CONV")
-#  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
-#  pids+=("$!")
+  #  nohup  python3 ../starter_kit/mhd_viewer_RayS.py DOSE_${E}MeV.mhd -CT ../imgs/CT_plan.mhd -roi ../imgs/PTV_plan.mhd "${all_rois_path[@]}" -png > trash.out &
+  #  pids+=("$!")
   cd ..
 
-   echo "Ripristino le dimensioni originali della Mappa di Dose per ${E}MeV..."
-cropZ=$(<imgs/cropZ.txt)
+  echo "Ripristino le dimensioni originali della Mappa di Dose per ${E}MeV..."
+  cropZ=$(<imgs/cropZ.txt)
   # 1. De-crop (padding)
   python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd -cz "$cropZ"
   python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd -cz "$cropZ"
@@ -386,18 +390,21 @@ cropZ=$(<imgs/cropZ.txt)
   #invSHy=$PTVy
   #invSHz=$Z0crop
 
-  python3 starter_kit/mhd_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd
-  python3 starter_kit/mhd_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd
+  python3 starter_kit/map_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd
+  python3 starter_kit/map_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd
   awk '/ROTATION MATRIX/{flag=1; next} /Rotated image/{flag=0} flag' imgs/CT_ROT_matrix.txt | tr -d '[]' > imgs/rotation_matrix.txt
 
   # 3. Contro-rotazione
   python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
 
-echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
+  echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
 
-python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
+  python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
 
-echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
+  echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
+
+  mv "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd" "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_BEV.mhd"
+  mv "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd" "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_BEV.mhd"
 
 
 
@@ -429,25 +436,79 @@ printf "%s\n" "${DVHdirs[@]}"
 python3 starter_kit/GetDVHPlot.py "${DVHdirs[@]}" --xunit "cGy" --out "./DVH_ALL_${FIELD_ID}.png"
 
 for E in ${energies[@]}; do
-# Cartella di output univoca per evitare sovrascritture in run successivi
-mv "sim${E}MeV" "MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}"
-echo "L R T B = left right top bottom slit aperture in cm (ID: ${FIELD_ID})"
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.raw
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.rawi=1
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_1pulses_CONV.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_1pulses_FLASH.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_CONV.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_FLASH.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_GRID.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_orig.mhd
-rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/dose_tot*.mhd
+  SIMDIR="sim${E}MeV"
+  python3 starter_kit/ptv_isocenter.py imgs/PTV_plan.mhd > isocenter.out
+  ISO=$(cat isocenter.out)
+  [[ -n "$ISO" ]] || { echo "Isocentro non calcolato"; exit 1; }
+
+  export FRED_MATPLOTLIB_BACKEND=Agg
+
+  shopt -s nullglob
+
+  # Create isodose maps using the dose files produced by this simulation.
+  for MODE in FLASH CONV; do
+    dose_maps=( "${SIMDIR}"/DOSE_${E}MeV_*pulses_${MODE}_BEV.mhd )
+    if [[ ${#dose_maps[@]} -ne 1 ]]; then
+      echo "Errore: attesa una mappa ${MODE} in ${SIMDIR}, trovate ${#dose_maps[@]}"
+      exit 1
+    fi
+
+    DOSE_MAP="${dose_maps[0]}"
+    python3 starter_kit/create_isodosemap.py \
+      -i "$DOSE_MAP" \
+      -o "${DOSE_MAP%.mhd}_isodosemap.mhd"
+
+    FINAL_MAP="${DOSE_MAP%_BEV.mhd}_FINAL.mhd"
+    [[ -f "$FINAL_MAP" ]] || { echo "Errore: mappa finale non trovata: $FINAL_MAP"; exit 1; }
+    python3 starter_kit/create_isodosemap.py \
+      -i "$FINAL_MAP" \
+      -o "${FINAL_MAP%.mhd}_isodose.mhd"
+  done
+
+  for MODE in FLASH CONV; do
+    # il numero di impulsi nel nome viene sostituito dall'asterisco
+    maps=( "${SIMDIR}"/DOSE_${E}MeV_*pulses_${MODE}_BEV_isodosemap.mhd )
+
+    if [[ ${#maps[@]} -eq 0 ]]; then
+      echo "Attenzione: mappa ${MODE} non trovata in ${SIMDIR}"
+      continue
+    elif [[ ${#maps[@]} -gt 1 ]]; then
+      echo "Attenzione: piu' mappe ${MODE} in ${SIMDIR}, uso ${maps[0]}"
+    fi
+    MAP="${maps[0]}"
+    OUT="${SIMDIR}/ISODOSE_BEV_${E}_${MODE}_${FIELD_ID}.png"
+
+    rm -f plot.png
+    python3 -W ignore starter_kit/map_viewer_isodose.py \
+        -CT imgs/CT_plan.mhd -map "$MAP" \
+        -Dgoal 1 -ISO $ISO -png > /dev/null
+    if [[ -f plot.png ]]; then
+      mv plot.png "$OUT"
+      echo "Creato $OUT"
+    else
+      echo "Errore: il viewer non ha prodotto l'immagine per $MAP"
+    fi
+  done
+  # Cartella di output univoca per evitare sovrascritture in run successivi
+  mv "sim${E}MeV" "MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}"
+  echo "L R T B = left right top bottom slit aperture in cm (ID: ${FIELD_ID})"
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED.raw
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/*PADDED_deSH.rawi=1
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_1pulses_CONV.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_1pulses_FLASH.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_CONV.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_FLASH.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_GRID.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/DOSE_${E}MeV_orig.mhd
+  rm -f MANUAL_sim${E}MeV_L${FLUKA_left_cm}_R${FLUKA_right_cm}_T${top_cm}_B${bottom_cm}_cm_${FIELD_ID}/dose_tot*.mhd
+
+
 done
 
+
 echo "Enjoy! Premere ctrl+c per uscire"
-
-
 
 
 

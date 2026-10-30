@@ -13,13 +13,15 @@ echo "ENERGY: ${energies[@]}" > setup.out
 #read pulses
 #echo "PULSES: ${pulses}" >> setup.out
 
-echo "Prescription dose [Gy] and volume [%]:"
+echo "Prescription dose [Gy], volume [%] and dose percentage [%] in said volume (referred to the prescription):"
 read -a preDV
 
 preD=${preDV[0]}
 preV=${preDV[1]}
-echo "PERCENTAGE PRESCRIPTION DOSE: ${preD}" >> setup.out
+Pdose=${preDV[2]}
+echo "PRESCRIPTION DOSE: ${preD}" >> setup.out
 echo "PERCENTAGE PRESCRIPTION VOLUME: ${preV}" >> setup.out
+echo "PERCENTAGE PRESCRIPTION DOSE: ${Pdose}" >> setup.out
 
 echo "How many primaries do you want to generate?"
 read primaries
