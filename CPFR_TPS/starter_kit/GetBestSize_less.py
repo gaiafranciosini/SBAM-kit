@@ -81,7 +81,9 @@ def candidate_files(folder, E):
             continue
         x, y = float(m[1]), float(m[2])
         ix = round((x - 2.0) / 0.2)
-        if 0 <= ix <= 15 and abs(x - (2 + ix * 0.2)) < 1e-7 and y in (2., 3., 3.2, 3.4, 3.6, 3.8, 4., 5.):
+        iy = round((y - 2.0) / 0.2)
+        if (0 <= ix <= 15 and abs(x - (2 + ix * 0.2)) < 1e-7
+                and 0 <= iy <= 15 and abs(y - (2 + iy * 0.2)) < 1e-7):
             files.append((x, y, path))
     return sorted(files, key=lambda v: (v[0], v[1]))
 
