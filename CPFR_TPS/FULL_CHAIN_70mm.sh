@@ -588,8 +588,8 @@ for E in "${energies[@]}"; do
   echo "Ripristino le dimensioni originali della Mappa di Dose per ${E}MeV..."
 
   # 1. De-crop (padding)
-  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd -cz "$cropZ" -r "imgs/Phantom.mhd"
-  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd -cz "$cropZ" -r "imgs/Phantom.mhd"
+  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd -cz "$cropZ"
+  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd -cz "$cropZ" 
 
   # 2. De-shift
   invSHx=$PTVx
@@ -834,7 +834,7 @@ run_variant() {
     for MODE in FLASH CONV; do
       p="${P[$MODE]}"
       base="${SIM}/DOSE_${E}MeV_${p}pulses_${MODE}"
-      python3 starter_kit/mhd_decrop.py -i "${base}.mhd" -o "${base}_PADDED.mhd" -cz "$cropZ" -r "imgs/Phantom.mhd"
+      python3 starter_kit/mhd_decrop.py -i "${base}.mhd" -o "${base}_PADDED.mhd" -cz "$cropZ" 
       #python3 starter_kit/map_shift.py "${base}_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" "${base}_PADDED_deSH.mhd"
       python3 starter_kit/RotDoseQuat.py "${base}_PADDED.mhd" "imgs/rotation_matrix.txt" "${base}_FINAL.mhd"
       mv "${base}.mhd" "${base}_BEV.mhd"
