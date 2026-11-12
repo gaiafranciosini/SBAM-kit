@@ -245,7 +245,15 @@ read -r dimX dimY dimZ < <(echo "$output" | awk '{
     print "";
 }')
 
-cropZ=$(( idxPTVz - 1 ))
+cropZ=$(python3 - <<'EOF'
+import SimpleITK as sitk, numpy as np
+a = sitk.GetArrayFromImage(sitk.ReadImage("imgs/PTV_SH.mhd"))   # (z, y, x)
+z = np.where(a.sum(axis=(1, 2)) > 0)[0]
+#margin = 5   # slice di margine, da scegliere in base alla fisica
+print(max(int(z.min()), 0))
+EOF
+)
+#cropZ=$(( idxPTVz - 1 ))
 if ((cropZ<0)); then
     cropZ=0
 fi
@@ -580,8 +588,8 @@ for E in "${energies[@]}"; do
   echo "Ripristino le dimensioni originali della Mappa di Dose per ${E}MeV..."
 
   # 1. De-crop (padding)
-  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd -cz "$cropZ"
-  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd -cz "$cropZ"
+  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd -cz "$cropZ" -r "imgs/Phantom.mhd"
+  python3 starter_kit/mhd_decrop.py -i sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV.mhd -o sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd -cz "$cropZ" -r "imgs/Phantom.mhd"
 
   # 2. De-shift
   invSHx=$PTVx
@@ -591,15 +599,15 @@ for E in "${energies[@]}"; do
   invSHz=$Z0crop
   echo "$invSHz" > imgs/invSHz.txt
 
-  python3 starter_kit/map_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd" "${invSHx}" "${invSHy}" "${invSHz}" sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd
-  python3 starter_kit/map_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd" "${invSHx}" "${invSHy}" "${invSHz}" sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd
+ # python3 starter_kit/map_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd" "${invSHx}" "${invSHy}" "${invSHz}" sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd
+#  python3 starter_kit/map_shift.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd" "${invSHx}" "${invSHy}" "${invSHz}" sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd
   awk '/ROTATION MATRIX/{flag=1; next} /Rotated image/{flag=0} flag' imgs/CT_ROT_matrix.txt | tr -d '[]' > imgs/rotation_matrix.txt
 
   # 3. Contro-rotazione
-  python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
+  python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_PADDED.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
   echo "Dose Map FLASH rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_FINAL.mhd"
 
-  python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
+  python3 starter_kit/RotDoseQuat.py "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_PADDED.mhd" "imgs/rotation_matrix.txt" "sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
   echo "Dose Map CONV rotated and saved in sim${E}MeV/DOSE_${E}MeV_${pulses_CONV}pulses_CONV_FINAL.mhd"
 
   mv sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH.mhd sim${E}MeV/DOSE_${E}MeV_${pulses_FLASH}pulses_FLASH_BEV.mhd
@@ -635,9 +643,9 @@ for E in "${energies[@]}"; do
     exit 1
   fi
 
-  rm -f "AUTO_sim${E}MeV_$idx"/*PADDED_deSH.mhd
+  
   rm -f "AUTO_sim${E}MeV_$idx"/*PADDED.mhd
-  rm -f "AUTO_sim${E}MeV_$idx"/*PADDED_deSH.raw
+  
   rm -f "AUTO_sim${E}MeV_$idx"/*PADDED.raw
   rm -f "AUTO_sim${E}MeV_$idx"/*fort.23
   rm -f "AUTO_sim${E}MeV_$idx"/*fort.19
@@ -652,8 +660,8 @@ for E in "${energies[@]}"; do
   rm -f "AUTO_sim${E}MeV_$idx"/dose_tot*.mhd
   rm -f "AUTO_sim${E}MeV_$idx"/avg.mhd
 
-  python3 starter_kit/create_isodosemap.py -i "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pf}pulses_FLASH_BEV.mhd -o "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pf}pulses_FLASH_BEV_isodosemap.mhd
-  python3 starter_kit/create_isodosemap.py -i "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pc}pulses_CONV_BEV.mhd -o "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pc}pulses_CONV_BEV_isodosemap.mhd
+  python3 starter_kit/create_isodosemap.py -i "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pf}pulses_FLASH_BEV.mhd -o "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pf}pulses_FLASH_BEV_isodose.mhd
+  python3 starter_kit/create_isodosemap.py -i "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pc}pulses_CONV_BEV.mhd -o "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pc}pulses_CONV_BEV_isodose.mhd
   python3 starter_kit/create_isodosemap.py -i "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pf}pulses_FLASH_FINAL.mhd -o "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pf}pulses_FLASH_FINAL_isodose.mhd
   python3 starter_kit/create_isodosemap.py -i "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pc}pulses_CONV_FINAL.mhd -o "AUTO_sim${E}MeV_$idx"/DOSE_${E}MeV_${pc}pulses_CONV_FINAL_isodose.mhd
 done
@@ -672,7 +680,7 @@ for E in "${energies[@]}"; do
 
   for MODE in FLASH CONV; do
     # il numero di impulsi nel nome viene sostituito dall'asterisco
-    maps=( "${SIMDIR}"/DOSE_${E}MeV_*pulses_${MODE}_BEV_isodosemap.mhd )
+    maps=( "${SIMDIR}"/DOSE_${E}MeV_*pulses_${MODE}_BEV_isodose.mhd )
 
     if [[ ${#maps[@]} -eq 0 ]]; then
       echo "Attenzione: mappa ${MODE} non trovata in ${SIMDIR}"
@@ -826,11 +834,11 @@ run_variant() {
     for MODE in FLASH CONV; do
       p="${P[$MODE]}"
       base="${SIM}/DOSE_${E}MeV_${p}pulses_${MODE}"
-      python3 starter_kit/mhd_decrop.py -i "${base}.mhd" -o "${base}_PADDED.mhd" -cz "$cropZ"
-      python3 starter_kit/map_shift.py "${base}_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" "${base}_PADDED_deSH.mhd"
-      python3 starter_kit/RotDoseQuat.py "${base}_PADDED_deSH.mhd" "imgs/rotation_matrix.txt" "${base}_FINAL.mhd"
+      python3 starter_kit/mhd_decrop.py -i "${base}.mhd" -o "${base}_PADDED.mhd" -cz "$cropZ" -r "imgs/Phantom.mhd"
+      #python3 starter_kit/map_shift.py "${base}_PADDED.mhd" "$invSHx" "$invSHy" "$invSHz" "${base}_PADDED_deSH.mhd"
+      python3 starter_kit/RotDoseQuat.py "${base}_PADDED.mhd" "imgs/rotation_matrix.txt" "${base}_FINAL.mhd"
       mv "${base}.mhd" "${base}_BEV.mhd"
-      python3 starter_kit/create_isodosemap.py -i "${base}_BEV.mhd"   -o "${base}_BEV_isodosemap.mhd"
+      python3 starter_kit/create_isodosemap.py -i "${base}_BEV.mhd"   -o "${base}_BEV_isodose.mhd"
       python3 starter_kit/create_isodosemap.py -i "${base}_FINAL.mhd" -o "${base}_FINAL_isodose.mhd"
   done
  
@@ -848,7 +856,7 @@ run_variant() {
   # ---- 5. pulizia e rinomina (indice AUTO corretto per ogni energia) ----
   for E in "${energies[@]}"; do
     SIM="sim${E}MeV_${VAR}"
-    rm -f "$SIM"/*PADDED.mhd "$SIM"/*PADDED_deSH.mhd "$SIM"/*PADDED.raw "$SIM"/*PADDED_deSH.raw
+    rm -f "$SIM"/*PADDED.mhd  "$SIM"/*PADDED.raw 
     rm -f "$SIM"/*fort.23 "$SIM"/*fort.19 "$SIM"/*.log "$SIM"/*R00*.out
     rm -f "$SIM"/DOSE_${E}MeV_{1pulses_CONV,1pulses_FLASH,CONV,FLASH,GRID,orig}.mhd
     rm -f "$SIM"/dose_tot*.mhd "$SIM"/avg.mhd
