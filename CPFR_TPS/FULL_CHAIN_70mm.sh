@@ -875,7 +875,7 @@ for E in "${energies[@]}"; do
 
     for MODE in FLASH CONV; do
       # Seleziona la mappa BEV dell'energia e della modalità corrente
-      maps=( "${AUTO}"/DOSE_${E}MeV_*pulses_${MODE}_BEV_isodosemap.mhd )
+      maps=( "${AUTO}"/DOSE_${E}MeV_*pulses_${MODE}_BEV_isodose.mhd )
 
       if [[ ${#maps[@]} -eq 0 ]]; then
         echo "Attenzione: mappa isodose ${MODE} non trovata in ${AUTO}"
